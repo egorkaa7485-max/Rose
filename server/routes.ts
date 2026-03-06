@@ -326,6 +326,13 @@ export async function registerRoutes(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: user.telegramId, text }),
       }).catch(() => {});
+
+      const managerText = `📞 С вами свяжется менеджер для уточнения данных доставки в течение часа.`;
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: user.telegramId, text: managerText }),
+      }).catch(() => {});
     }
     res.status(201).json(giftCode);
   });

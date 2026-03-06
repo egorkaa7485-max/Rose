@@ -1,17 +1,43 @@
 import { useState } from "react";
 import { TopBar, BottomNav } from "@/components/Navigation";
-import { useUser } from "@/hooks/use-user";
+import { useUser, useApplyReferral } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Gift, KeyRound } from "lucide-react";
+import { Loader2, Sparkles, Gift, KeyRound, Users, Copy, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 
 export default function Profile() {
   const { data: user, isLoading, refetch } = useUser();
+  const { mutate: applyCode, isPending } = useApplyReferral();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [creatingCode, setCreatingCode] = useState(false);
   const [giftCodeInput, setGiftCodeInput] = useState("");
+  const [referralCodeInput, setReferralCodeInput] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyReferral = () => {
+    if (user?.referralCode) {
+      navigator.clipboard.writeText(user.referralCode);
+      setCopied(true);
+      toast({ title: "Скопировано в буфер обмена!" });
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleSubmitReferralCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!referralCodeInput.trim()) return;
+    applyCode(referralCodeInput.trim(), {
+      onSuccess: (data) => {
+        toast({ title: "Готово!", description: data.message });
+        setReferralCodeInput("");
+      },
+      onError: (err) => {
+        toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+      },
+    });
+  };
 
   const handleCreateCode = async () => {
     if (!user) return;
@@ -105,6 +131,51 @@ export default function Profile() {
       </motion.div>
 
       <div className="space-y-6">
+        <div className="glass-card rounded-[1.5rem] p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Users className="w-6 h-6 text-primary" />
+            <h3 className="font-display font-bold text-lg">Пригласить друзей</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Делитесь своим кодом: когда друг совершит покупку, вы получите 500 баллов (после подтверждения в админке).
+          </p>
+          <div className="flex items-center bg-background rounded-xl border border-border p-2 pl-4 mb-4">
+            <code className="flex-1 font-mono text-primary font-bold tracking-widest text-lg">
+              {user.referralCode}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopyReferral}
+              className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+            >
+              {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-[1.5rem] p-6">
+          <h3 className="font-display font-bold text-lg mb-2">Есть пригласительный код?</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Введите код друга и получите скидку 250₽ на все товары.
+          </p>
+          <form onSubmit={handleSubmitReferralCode} className="flex gap-2 mb-6">
+            <input
+              type="text"
+              value={referralCodeInput}
+              onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+              placeholder="например, ROSE2024"
+              className="flex-1 bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:border-primary font-mono uppercase"
+            />
+            <button
+              type="submit"
+              disabled={isPending || !referralCodeInput.trim()}
+              className="px-6 py-3 bg-gradient-to-r from-primary to-accent text-white font-bold rounded-xl disabled:opacity-50"
+            >
+              {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Активировать"}
+            </button>
+          </form>
+        </div>
+
         <div className="glass-card rounded-[1.5rem] p-6">
           <div className="flex items-center gap-3 mb-4">
             <Gift className="w-6 h-6 text-primary" />

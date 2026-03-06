@@ -7,8 +7,8 @@ import { useProducts } from "@/hooks/use-products";
 import { useUser } from "@/hooks/use-user";
 import { useCreateOrder } from "@/hooks/use-orders";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Loader2, Sparkles } from "lucide-react";
+import { FilterBar } from "@/components/FilterBar";
 import type { Product } from "@shared/schema";
 
 export default function PointsShop() {
@@ -66,31 +66,14 @@ export default function PointsShop() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 min-w-[140px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-background"
-          />
-        </div>
-        <Input
-          type="number"
-          placeholder="Цена от (₽)"
-          value={priceFrom}
-          onChange={(e) => setPriceFrom(e.target.value)}
-          className="w-28 bg-background"
-        />
-        <Input
-          type="number"
-          placeholder="Цена до (₽)"
-          value={priceTo}
-          onChange={(e) => setPriceTo(e.target.value)}
-          className="w-28 bg-background"
-        />
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        priceFrom={priceFrom}
+        onPriceFromChange={setPriceFrom}
+        priceTo={priceTo}
+        onPriceToChange={setPriceTo}
+      />
 
       {isLoading ? (
         <div className="flex justify-center py-20">
