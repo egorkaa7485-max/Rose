@@ -84,7 +84,12 @@ export async function registerRoutes(
         }
       }
       
-      const order = await storage.createOrder({ ...input, userId: mockUserId });
+      const user = await storage.getUser(mockUserId);
+      const order = await storage.createOrder({
+        ...input,
+        userId: mockUserId,
+        referrerId: user?.referrerId ?? undefined,
+      });
       res.status(201).json(order);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -129,22 +134,20 @@ export async function registerRoutes(
       const input = api.user.useReferral.input.parse(req.body);
       const referrer = await storage.getUserByReferralCode(input.code);
       if (!referrer) {
-        return res.status(400).json({ message: "Invalid referral code" });
+        return res.status(400).json({ message: "Неверный промокод" });
       }
       if (referrer.id === mockUserId) {
-        return res.status(400).json({ message: "Cannot use your own code" });
+        return res.status(400).json({ message: "Нельзя использовать свой код" });
       }
       
-      // award 10 points to referrer
-      await storage.updateUserPoints(referrer.id, referrer.points + 10);
-      
-      // give some points to the current user too
       const currentUser = await storage.getUser(mockUserId);
-      if (currentUser) {
-         await storage.updateUserPoints(currentUser.id, currentUser.points + 5);
+      if (!currentUser) return res.status(404).json({ message: "User not found" });
+      if (currentUser.referrerId) {
+        return res.status(400).json({ message: "Промокод уже был применён ранее" });
       }
       
-      res.json({ message: "Referral applied! Points awarded.", points: 5 });
+      await storage.setUserReferrer(mockUserId, referrer.id);
+      res.json({ message: "Промокод применён! Скидка 250₽ на все товары.", points: 0 });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
@@ -154,6 +157,63 @@ export async function registerRoutes(
       }
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  // Admin API (проверка по заголовку X-Admin-Secret)
+  const adminSecret = process.env.ADMIN_SECRET || "admin123";
+  const isAdmin = (req: { headers: { [k: string]: string | undefined } }) =>
+    req.headers["x-admin-secret"] === adminSecret;
+
+  app.get("/api/admin/orders", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const list = await storage.getOrders();
+    const withUsers = await Promise.all(
+      list.map(async (o) => {
+        const u = await storage.getUser(o.userId);
+        const ref = o.referrerId ? await storage.getUser(o.referrerId) : null;
+        const p = await storage.getProduct(o.productId);
+        return {
+          ...o,
+          user: u ? { id: u.id, username: u.username } : null,
+          referrer: ref ? { id: ref.id, username: ref.username, referralCode: ref.referralCode } : null,
+          product: p ? { id: p.id, name: p.name } : null,
+        };
+      })
+    );
+    res.json(withUsers);
+  });
+
+  app.post("/api/admin/orders/:id/confirm-referral", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const result = await storage.confirmReferralBonus(id);
+    if (!result.ok) return res.status(400).json({ message: result.message });
+    res.json({ message: "500 баллов выданы рефереру" });
+  });
+
+  app.post("/api/admin/products", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const { name, description, price, pointsPrice, category, imageUrl } = req.body;
+    if (!name || !description || price == null || !category || !imageUrl) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+    const p = await storage.createProduct({
+      name,
+      description,
+      price: parseInt(price, 10),
+      pointsPrice: pointsPrice ? parseInt(pointsPrice, 10) : null,
+      category,
+      imageUrl,
+    });
+    res.status(201).json(p);
+  });
+
+  app.post("/api/admin/bloggers", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const { nickname, avatarUrl } = req.body;
+    if (!nickname || !avatarUrl) return res.status(400).json({ message: "Missing nickname or avatarUrl" });
+    const b = await storage.createBlogger({ nickname, avatarUrl });
+    res.status(201).json(b);
   });
 
   // Seed database on startup

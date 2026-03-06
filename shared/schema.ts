@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   points: integer("points").notNull().default(0),
   referralCode: text("referral_code").notNull().unique(),
+  referrerId: integer("referrer_id"), // кто привёл (при использовании промокода)
 });
 
 export const products = pgTable("products", {
@@ -32,6 +33,8 @@ export const orders = pgTable("orders", {
   productId: integer("product_id").notNull(),
   paymentMethod: text("payment_method").notNull(), // 'cash' or 'points'
   status: text("status").notNull().default("pending"),
+  referrerId: integer("referrer_id"), // от кого пришёл покупатель
+  referralBonusGiven: integer("referral_bonus_given").notNull().default(0), // 1 = выдано 500 рефереру
   createdAt: timestamp("created_at").defaultNow(),
 });
 

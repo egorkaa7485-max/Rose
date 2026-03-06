@@ -2,14 +2,17 @@ import { motion } from "framer-motion";
 import { Heart, Plus } from "lucide-react";
 import type { Product } from "@shared/schema";
 
+const REFERRAL_DISCOUNT = 25000; // 250₽ в копейках
+
 interface ProductCardProps {
   product: Product;
   onAction?: () => void;
   actionText?: string;
   usePoints?: boolean;
+  hasReferralDiscount?: boolean;
 }
 
-export function ProductCard({ product, onAction, actionText = "Add to Cart", usePoints = false }: ProductCardProps) {
+export function ProductCard({ product, onAction, actionText = "Add to Cart", usePoints = false, hasReferralDiscount = false }: ProductCardProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -49,7 +52,14 @@ export function ProductCard({ product, onAction, actionText = "Add to Cart", use
                   {product.pointsPrice}
                 </>
               ) : (
-                `${(product.price / 100).toFixed(2)} ₽`
+                <>
+                  {hasReferralDiscount && product.price > REFERRAL_DISCOUNT && (
+                    <span className="line-through text-muted-foreground text-sm mr-1">
+                      {(product.price / 100).toFixed(0)} ₽
+                    </span>
+                  )}
+                  {(Math.max(0, product.price - (hasReferralDiscount ? REFERRAL_DISCOUNT : 0)) / 100).toFixed(0)} ₽
+                </>
               )}
             </span>
           </div>

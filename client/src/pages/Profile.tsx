@@ -73,7 +73,7 @@ export default function Profile() {
         
         <div className="mt-6 flex items-center justify-center gap-2 text-amber-500 bg-amber-500/10 py-2 px-4 rounded-full w-max mx-auto">
           <Sparkles className="w-5 h-5" />
-          <span className="font-bold text-lg">{user.points} Points</span>
+          <span className="font-bold text-lg">{user.points} баллов</span>
         </div>
       </motion.div>
 
@@ -84,7 +84,7 @@ export default function Profile() {
             <h3 className="font-display font-bold text-lg">Пригласить друзей</h3>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Делитесь своим кодом: когда друг вводит его, вы оба получаете бонусные баллы!
+            Делитесь своим кодом: когда друг совершит покупку, вы получите 500 баллов (после подтверждения в админке).
           </p>
           <div className="flex items-center bg-background rounded-xl border border-border p-2 pl-4">
             <code className="flex-1 font-mono text-primary font-bold tracking-widest text-lg">
@@ -102,7 +102,7 @@ export default function Profile() {
         <div className="glass-card rounded-[1.5rem] p-6">
           <h3 className="font-display font-bold text-lg mb-2">Есть пригласительный код?</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Введите код друга и получите приветственные бонусные баллы.
+            Введите код друга и получите скидку 250₽ на все товары.
           </p>
           <form onSubmit={handleSubmitCode} className="flex gap-2">
             <input 

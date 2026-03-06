@@ -89,6 +89,7 @@ export default function Home() {
                 key={product.id} 
                 product={product} 
                 onAction={() => handlePurchase(product.id)}
+                hasReferralDiscount={!!user?.referrerId}
               />
             ))}
           </AnimatePresence>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
@@ -9,6 +9,37 @@ export default function MockLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+
+  // Авто-логин через Telegram WebApp, если приложение запущено внутри Телеграма
+  useEffect(() => {
+    const anyWindow = window as any;
+    const tg = anyWindow.Telegram?.WebApp;
+    const tgUser = tg?.initDataUnsafe?.user;
+
+    if (!tgUser) return;
+
+    const username =
+      tgUser.username ||
+      `${tgUser.first_name || "user"}_${tgUser.id}`;
+
+    setIsLoading(true);
+
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Telegram login failed");
+        const user = await res.json();
+        queryClient.setQueryData([api.user.me.path], user);
+        setLocation("/");
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
+  }, [queryClient, setLocation]);
 
   const handleBypassAuth = () => {
     setIsLoading(true);
@@ -53,10 +84,6 @@ export default function MockLogin() {
         >
           {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Войти в бутик"}
         </button>
-        
-        <p className="mt-6 text-xs text-muted-foreground">
-          Это демонстрационный вход без реальной авторизации.
-        </p>
       </motion.div>
     </div>
   );

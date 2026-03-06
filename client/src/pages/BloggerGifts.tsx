@@ -62,20 +62,20 @@ export default function BloggerGifts() {
               <button
                 key={blogger.id}
                 onClick={() => setSelectedBloggerId(blogger.id)}
-                className={`relative flex flex-col items-center flex-shrink-0 w-24 gap-2 transition-all duration-300 ${
-                  selectedBloggerId === blogger.id ? "scale-110" : "opacity-70 hover:opacity-100"
+                className={`relative flex flex-col items-center flex-shrink-0 w-32 gap-2 transition-all duration-300 ${
+                  selectedBloggerId === blogger.id ? "scale-105" : "opacity-70 hover:opacity-100"
                 }`}
               >
-                <div className={`w-20 h-20 rounded-full p-1 transition-all duration-300 ${
+                <div className={`w-28 h-28 rounded-2xl overflow-hidden p-1 transition-all duration-300 ${
                   selectedBloggerId === blogger.id ? "bg-gradient-to-tr from-primary to-accent shadow-lg shadow-primary/30" : "bg-white/50"
                 }`}>
                   <img 
                     src={blogger.avatarUrl} 
                     alt={blogger.nickname} 
-                    className="w-full h-full rounded-full object-cover border-2 border-white"
+                    className="w-full h-full object-cover"
                   />
                 </div>
-                <span className="text-xs font-medium text-center truncate w-full">
+                <span className="text-sm font-medium text-center truncate w-full">
                   @{blogger.nickname}
                 </span>
                 
@@ -103,12 +103,13 @@ export default function BloggerGifts() {
                <div className="h-40 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {products?.slice(0, 6).map((product) => (
+                {products?.map((product) => (
                   <ProductCard 
                     key={product.id} 
                     product={product} 
                     actionText="Отправить"
                     onAction={() => handleSendGift(product.id)}
+                    hasReferralDiscount={!!user?.referrerId}
                   />
                 ))}
               </div>
