@@ -14,6 +14,7 @@ import Admin from "@/pages/Admin";
 
 import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
+import { CartProvider } from "@/hooks/use-cart";
 
 // Auth Guard Wrapper
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -51,8 +52,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Router />
-        <Toaster />
+        <CartProvider>
+          <Router />
+          <Toaster />
+        </CartProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

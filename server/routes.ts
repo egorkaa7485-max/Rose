@@ -282,6 +282,70 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.checkout.telegram.path, async (req, res) => {
+    if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const input = api.checkout.telegram.input.parse(req.body);
+      if (!input.items.length) {
+        return res.status(400).json({ message: "Корзина пуста" });
+      }
+
+      const user = await storage.getUser(mockUserId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const total = input.items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+
+      const lines = input.items.map((item) => {
+        const base = `• ${item.name} × ${item.quantity} — ${(item.price * item.quantity / 100).toFixed(0)} ₽`;
+        if (item.isForBlogger && item.bloggerNickname) {
+          return `${base} (для блогера ${item.bloggerNickname})`;
+        }
+        return base;
+      });
+
+      const username =
+        user.tgUsername ? `@${user.tgUsername}` : `@${user.username}`;
+
+      const text =
+        `🌸 Новый заказ из мини-аппа Bloom & Bliss\n` +
+        `Пользователь: ${username} (id ${user.id})\n\n` +
+        `Позиции:\n${lines.join("\n")}\n\n` +
+        `Итого: ${(total / 100).toFixed(0)} ₽`;
+
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (!token) {
+        return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN is not set" });
+      }
+
+      const chatId = "@CEO_PE";
+      const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+        }),
+      });
+
+      if (!tgRes.ok) {
+        return res.status(500).json({ message: "Failed to send Telegram message" });
+      }
+
+      return res.json({ message: "Заказ отправлен в Telegram" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Admin API (проверка по заголовку X-Admin-Secret)
   const adminSecret = process.env.ADMIN_SECRET || "admin123";
   const isAdmin = (req: Request) => (req.header("X-Admin-Secret") ?? "") === adminSecret;

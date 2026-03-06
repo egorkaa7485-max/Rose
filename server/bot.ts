@@ -2,7 +2,7 @@ import "dotenv/config";
 import TelegramBot from "node-telegram-bot-api";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const appUrl = process.env.APP_URL || "https://your-mini-app-url.com";
+const appUrl = process.env.APP_URL || "https://rose-production-f333.up.railway.app/";
 
 if (!token) {
   console.error("TELEGRAM_BOT_TOKEN is required. Set it in .env");

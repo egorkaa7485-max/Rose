@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TopBar, BottomNav } from "@/components/Navigation";
 import { ProductCard } from "@/components/ProductCard";
 import { useProducts } from "@/hooks/use-products";
-import { useCreateOrder } from "@/hooks/use-orders";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { CartBar } from "@/components/CartBar";
 
 const CATEGORIES = [
   { id: "all", label: "Вся магия" },
@@ -19,9 +20,9 @@ const CATEGORIES = [
 export default function Home() {
   const [activeTab, setActiveTab] = useState("all");
   const { data: products, isLoading } = useProducts(activeTab === "all" ? undefined : activeTab);
-  const { mutate: createOrder, isPending } = useCreateOrder();
   const { data: user } = useUser();
   const { toast } = useToast();
+  const { addItem } = useCart();
 
   useEffect(() => {
     if (!user) return;
@@ -39,14 +40,10 @@ export default function Home() {
       toast({ title: "Авторизуйтесь", description: "Для оформления заказа нужен аккаунт.", variant: "destructive" });
       return;
     }
-    createOrder(
-      { userId: user.id, productId, paymentMethod: "cash" },
-      {
-        onSuccess: () => {
-          toast({ title: "Заказ оформлен!", description: "Ваш красивый подарок уже в пути." });
-        }
-      }
-    );
+    const product = products?.find((p) => p.id === productId);
+    if (!product) return;
+    addItem(product);
+    toast({ title: "В корзине", description: `${product.name} добавлен в корзину.` });
   };
 
   return (
@@ -112,6 +109,7 @@ export default function Home() {
         </motion.div>
       )}
 
+      <CartBar />
       <BottomNav />
     </div>
   );

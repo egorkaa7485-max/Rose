@@ -7,6 +7,7 @@ import { useProducts } from "@/hooks/use-products";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, Gift } from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
 
 function formatNickname(nickname: string) {
   const trimmed = nickname?.trim() ?? "";
@@ -21,6 +22,7 @@ export default function BloggerGifts() {
   const { data: user } = useUser();
   const { mutate: sendGift, isPending } = useSendBloggerGift();
   const { toast } = useToast();
+  const { addItem } = useCart();
 
   const handleSendGift = (productId: number) => {
     if (!user) {
@@ -36,7 +38,18 @@ export default function BloggerGifts() {
       { userId: user.id, bloggerId: selectedBloggerId, productId },
       {
         onSuccess: () => {
-          toast({ title: "Подарок отправлен! 🎁", description: "Блогер получит ваш красивый сюрприз." });
+          const blogger = bloggers?.find((b) => b.id === selectedBloggerId);
+          const product = products?.find((p) => p.id === productId);
+          if (product && blogger) {
+            addItem(product, {
+              isForBlogger: true,
+              bloggerNickname: formatNickname(blogger.nickname),
+            });
+          }
+          toast({
+            title: "Подарок отправлен! 🎁",
+            description: "Блогер получит ваш красивый сюрприз, а позиция добавлена в корзину.",
+          });
           setSelectedBloggerId(null);
         }
       }

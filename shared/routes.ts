@@ -29,6 +29,29 @@ export const api = {
       },
     },
   },
+  checkout: {
+    telegram: {
+      method: 'POST' as const,
+      path: '/api/checkout/telegram' as const,
+      input: z.object({
+        items: z.array(
+          z.object({
+            productId: z.number(),
+            name: z.string(),
+            price: z.number(), // в копейках
+            quantity: z.number().int().positive(),
+            isForBlogger: z.boolean().optional(),
+            bloggerNickname: z.string().optional(),
+          }),
+        ),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.badRequest,
+        401: errorSchemas.unauthorized,
+      },
+    },
+  },
   products: {
     list: {
       method: 'GET' as const,
