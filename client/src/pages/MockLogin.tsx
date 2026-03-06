@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
-import { Loader2, Flower2 } from "lucide-react";
+import { Loader2, Flower2, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function MockLogin() {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
@@ -14,55 +15,44 @@ export default function MockLogin() {
   useEffect(() => {
     const anyWindow = window as any;
     const tg = anyWindow.Telegram?.WebApp;
-    const tgUser = tg?.initDataUnsafe?.user;
+    const initData: string | undefined = tg?.initData;
 
-    if (!tgUser) return;
-
-    const username =
-      tgUser.username ||
-      `${tgUser.first_name || "user"}_${tgUser.id}`;
+    // Not inside Telegram
+    if (!tg || !initData) return;
 
     setIsLoading(true);
+    setError(null);
 
-    fetch("/api/login", {
+    try {
+      tg.ready?.();
+      tg.expand?.();
+    } catch {
+      // ignore
+    }
+
+    fetch(api.telegram.login.path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username,
-        telegramId: tgUser.id,
-        tgUsername: tgUser.username ?? null,
-        firstName: tgUser.first_name ?? null,
-        lastName: tgUser.last_name ?? null,
-        avatarUrl: tgUser.photo_url ?? null,
+        initData,
       }),
       credentials: "include",
     })
       .then(async (res) => {
-        if (!res.ok) throw new Error("Telegram login failed");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.message || "Telegram login failed");
+        }
         const user = await res.json();
         queryClient.setQueryData([api.user.me.path], user);
         sessionStorage.setItem("welcome_shown", "0");
         setLocation("/");
       })
-      .catch(() => {
+      .catch((e) => {
+        setError(e?.message || "Не удалось получить данные Telegram");
         setIsLoading(false);
       });
   }, [queryClient, setLocation]);
-
-  const handleBypassAuth = () => {
-    setIsLoading(true);
-    // Simulate network delay
-    setTimeout(() => {
-      // Inject mock user into cache so the UI works
-      queryClient.setQueryData([api.user.me.path], {
-        id: 1,
-        username: "beauty_lover",
-        points: 450,
-        referralCode: "BEAUTY450"
-      });
-      setLocation("/");
-    }, 1000);
-  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -85,13 +75,31 @@ export default function MockLogin() {
           Добро пожаловать в наш атмосферный цветочный бутик. Войдите, чтобы окунуться в магию.
         </p>
 
-        <button 
-          onClick={handleBypassAuth}
-          disabled={isLoading}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-accent text-white font-bold text-lg shadow-xl shadow-primary/25 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex justify-center items-center gap-2"
-        >
-          {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Войти в бутик"}
-        </button>
+        {error && (
+          <div className="mb-4 text-sm text-destructive bg-destructive/10 rounded-xl p-3">
+            {error}
+          </div>
+        )}
+
+        <div className="glass-card rounded-2xl p-4 text-left text-sm text-muted-foreground">
+          <div className="font-medium text-foreground mb-1">Вход через Telegram</div>
+          <div>
+            Откройте мини‑апп из Telegram через команду <code>/start</code> и кнопку «Открыть мини‑апп».
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span>Получаем данные Telegram…</span>
+              </>
+            ) : (
+              <>
+                <ExternalLink className="w-4 h-4" />
+                <span>Ожидание запуска из Telegram</span>
+              </>
+            )}
+          </div>
+        </div>
       </motion.div>
     </div>
   );

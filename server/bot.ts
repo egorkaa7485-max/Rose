@@ -11,7 +11,7 @@ if (!token) {
 
 const bot = new TelegramBot(token, { polling: true });
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, (msg: TelegramBot.Message) => {
   const chatId = msg.chat.id;
   bot.sendMessage(
     chatId,

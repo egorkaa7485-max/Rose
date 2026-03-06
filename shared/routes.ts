@@ -18,6 +18,17 @@ export const errorSchemas = {
 };
 
 export const api = {
+  telegram: {
+    login: {
+      method: 'POST' as const,
+      path: '/api/telegram/login' as const,
+      input: z.object({ initData: z.string().min(1) }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.badRequest,
+      },
+    },
+  },
   products: {
     list: {
       method: 'GET' as const,

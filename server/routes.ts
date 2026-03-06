@@ -1,10 +1,11 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { db } from "./db";
 import { bloggers as bloggersTable, products as productsTable } from "@shared/schema";
+import crypto from "crypto";
 
 // Mock user for simplicity since we don't have real auth set up fully yet
 let mockUserId: number | null = null;
@@ -39,6 +40,88 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || "";
+
+  function validateTelegramInitData(initData: string): { ok: true; params: URLSearchParams } | { ok: false } {
+    try {
+      if (!botToken) return { ok: false };
+      const params = new URLSearchParams(initData);
+      const hash = params.get("hash");
+      if (!hash) return { ok: false };
+
+      params.delete("hash");
+      const pairs: string[] = [];
+      Array.from(params.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([k, v]) => pairs.push(`${k}=${v}`));
+
+      const dataCheckString = pairs.join("\n");
+      const secretKey = crypto.createHmac("sha256", "WebAppData").update(botToken).digest();
+      const computed = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+      if (computed !== hash) return { ok: false };
+      return { ok: true, params };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  app.post(api.telegram.login.path, async (req, res) => {
+    try {
+      const input = api.telegram.login.input.parse(req.body);
+      const validated = validateTelegramInitData(input.initData);
+      if (!validated.ok) return res.status(400).json({ message: "Telegram initData invalid" });
+
+      const userJson = validated.params.get("user");
+      if (!userJson) return res.status(400).json({ message: "Missing user in initData" });
+
+      const tgUser = JSON.parse(userJson) as {
+        id: number;
+        username?: string;
+        first_name?: string;
+        last_name?: string;
+        photo_url?: string;
+      };
+
+      const telegramId = Number(tgUser.id);
+      if (!Number.isFinite(telegramId)) return res.status(400).json({ message: "Invalid telegram id" });
+
+      let user = await storage.getUserByTelegramId(telegramId);
+      const username =
+        tgUser.username ||
+        (tgUser.first_name ? `${tgUser.first_name}_${telegramId}` : `user_${telegramId}`);
+
+      if (!user) {
+        user = await storage.createUser({
+          username,
+          password: "password",
+          telegramId,
+          tgUsername: tgUser.username ?? null,
+          firstName: tgUser.first_name ?? null,
+          lastName: tgUser.last_name ?? null,
+          avatarUrl: tgUser.photo_url ?? null,
+          referrerId: null,
+        } as any);
+      } else {
+        user =
+          (await storage.updateUserProfile(user.id, {
+            telegramId,
+            tgUsername: tgUser.username ?? null,
+            firstName: tgUser.first_name ?? null,
+            lastName: tgUser.last_name ?? null,
+            avatarUrl: tgUser.photo_url ?? null,
+          })) ?? user;
+      }
+
+      mockUserId = user.id;
+      return res.json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Simple login mock for testing
   app.post("/api/login", async (req, res) => {
     const { username, telegramId, tgUsername, firstName, lastName, avatarUrl } = req.body ?? {};
@@ -201,8 +284,7 @@ export async function registerRoutes(
 
   // Admin API (проверка по заголовку X-Admin-Secret)
   const adminSecret = process.env.ADMIN_SECRET || "admin123";
-  const isAdmin = (req: { headers: { [k: string]: string | undefined } }) =>
-    req.headers["x-admin-secret"] === adminSecret;
+  const isAdmin = (req: Request) => (req.header("X-Admin-Secret") ?? "") === adminSecret;
 
   app.get("/api/admin/orders", async (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });

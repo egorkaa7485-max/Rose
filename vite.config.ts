@@ -28,7 +28,10 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname, "client"),
   optimizeDeps: {
-    sourcemap: false, // экономит место на диске при pre-bundle
+    // экономит место на диске при pre-bundle
+    esbuildOptions: {
+      sourcemap: false,
+    },
   },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
