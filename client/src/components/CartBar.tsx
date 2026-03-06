@@ -30,7 +30,8 @@ export function CartBar() {
       }
       clear();
       setOpen(false);
-      toast({ title: "Заказ отправлен", description: "Перейдите в Telegram для оплаты." });
+      const orderRef = data?.orderRef ? ` ${data.orderRef}` : "";
+      toast({ title: "Заказ отправлен", description: `Перейдите в Telegram для оплаты.${orderRef}` });
       const botUrl = data?.botUrl || "https://t.me/CEO_PE";
       window.location.href = botUrl;
     } catch (e: unknown) {

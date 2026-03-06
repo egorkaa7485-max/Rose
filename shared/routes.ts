@@ -49,7 +49,7 @@ export const api = {
         ),
       }),
       responses: {
-        200: z.object({ message: z.string(), botUrl: z.string().optional() }),
+        200: z.object({ message: z.string(), botUrl: z.string().optional(), orderRef: z.string().optional() }),
         400: errorSchemas.badRequest,
         401: errorSchemas.unauthorized,
       },

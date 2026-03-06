@@ -449,26 +449,30 @@ export async function registerRoutes(
         return base;
       });
 
-      const username =
-        user.tgUsername ? `@${user.tgUsername}` : `@${user.username}`;
+      const orderUsername = user.tgUsername ? `@${user.tgUsername}` : user.username;
+      const orderRef = `BB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-      const text =
+      // Менеджеру @CEO_PE: юзернейм заказчика и детали заказа
+      const managerText =
         `🌸 Новый заказ из мини-аппа Bloom & Bliss\n` +
-        `Пользователь: ${username} (id ${user.id})\n\n` +
+        `Заказчик: ${orderUsername}\n` +
+        `Номер заказа: #${orderRef}\n\n` +
         `Позиции:\n${lines.join("\n")}\n\n` +
         `Итого: ${(total / 100).toFixed(0)} ₽`;
+
+      // Пользователю: связь с менеджером и номер заказа
+      const customerText =
+        `Для оформления заказа свяжитесь с менеджером @CEO_PE.\nНомер заказа: #${orderRef}`;
 
       const token = process.env.TELEGRAM_BOT_TOKEN;
       if (!token) {
         return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN не настроен. Обратитесь к администратору." });
       }
 
-      // Куда слать заказ: приоритет — чат менеджера, иначе заказчику (нужно, чтобы получатель первым написал боту /start)
-      const managerChatId = process.env.TELEGRAM_ORDER_CHAT_ID;
+      const managerChatId = process.env.TELEGRAM_ORDER_CHAT_ID || "@CEO_PE";
       const customerChatId = user.telegramId != null ? String(user.telegramId) : null;
-      let chatId = managerChatId || customerChatId || "@CEO_PE";
 
-      const sendToChat = async (to: string) => {
+      const sendToChat = async (to: string, text: string) => {
         const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -477,17 +481,14 @@ export async function registerRoutes(
         return { res: r, data: await r.json().catch(() => ({})) };
       };
 
-      let result = await sendToChat(chatId);
-      if (!result.res.ok && customerChatId && chatId !== customerChatId) {
-        result = await sendToChat(customerChatId);
-        if (result.res.ok) chatId = customerChatId;
-      }
+      const toManager = await sendToChat(managerChatId, managerText);
+      const toCustomer = customerChatId ? await sendToChat(customerChatId, customerText) : { res: { ok: true } };
 
-      if (!result.res.ok) {
-        const desc = result.data?.description || result.res.statusText || "Ошибка Telegram";
+      if (!toManager.res.ok) {
+        const desc = toManager.data?.description || toManager.res.statusText || "Ошибка Telegram";
         const hint = "Убедитесь, что получатель первым написал боту /start, или задайте TELEGRAM_ORDER_CHAT_ID (числовой id чата).";
         return res.status(502).json({
-          message: `Не удалось отправить заказ в Telegram: ${desc}. ${hint}`,
+          message: `Не удалось отправить заказ менеджеру: ${desc}. ${hint}`,
         });
       }
 
@@ -504,7 +505,7 @@ export async function registerRoutes(
         }
       }
 
-      return res.json({ message: "Заказ отправлен в Telegram", botUrl });
+      return res.json({ message: "Заказ отправлен в Telegram", botUrl, orderRef: `#${orderRef}` });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
