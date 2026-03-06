@@ -201,9 +201,11 @@ export async function registerRoutes(
   app.get(api.products.list.path, async (req, res) => {
     const category = req.query.category as string | undefined;
     const isFreeStr = req.query.isFree as string | undefined;
-    const isFree = isFreeStr === 'true';
-    
-    const products = await storage.getProducts(category, isFree);
+    const isFree = isFreeStr === "true";
+    const priceFrom = req.query.priceFrom != null ? parseInt(String(req.query.priceFrom), 10) * 100 : undefined;
+    const priceTo = req.query.priceTo != null ? parseInt(String(req.query.priceTo), 10) * 100 : undefined;
+    const search = req.query.search as string | undefined;
+    const products = await storage.getProducts(category, isFree, priceFrom, priceTo, search);
     res.json(products);
   });
 
@@ -307,6 +309,64 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/gift-codes", async (req, res) => {
+    if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
+    const user = await storage.getUser(mockUserId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const giftCode = await storage.createGiftCode(user.id, code);
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (token && user.telegramId) {
+      const text =
+        `🎁 Ваш код для подарков: ${code}\n\n` +
+        `Поделитесь этим кодом с друзьями — они смогут отправить вам подарок, не зная вашего адреса.\n\n` +
+        `Бот: @Rose_BlooM_bot`;
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: user.telegramId, text }),
+      }).catch(() => {});
+    }
+    res.status(201).json(giftCode);
+  });
+
+  app.get("/api/gift-codes/validate/:code", async (req, res) => {
+    const code = (req.params.code || "").trim().toUpperCase();
+    if (!code) return res.status(400).json({ message: "Код не указан" });
+    const giftCode = await storage.getGiftCodeByCode(code);
+    if (!giftCode) return res.status(404).json({ message: "Код не найден" });
+    const recipient = await storage.getUser(giftCode.userId);
+    if (!recipient) return res.status(404).json({ message: "Получатель не найден" });
+    res.json({
+      code: giftCode.code,
+      recipient: {
+        id: recipient.id,
+        username: recipient.username,
+        tgUsername: recipient.tgUsername,
+        firstName: recipient.firstName,
+        lastName: recipient.lastName,
+      },
+    });
+  });
+
+  app.post("/api/gift-orders", async (req, res) => {
+    if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
+    const { code, productId, recipientName } = req.body || {};
+    if (!code || !productId) return res.status(400).json({ message: "Код и товар обязательны" });
+    const giftCode = await storage.getGiftCodeByCode(String(code).trim().toUpperCase());
+    if (!giftCode) return res.status(404).json({ message: "Код не найден" });
+    const product = await storage.getProduct(Number(productId));
+    if (!product) return res.status(404).json({ message: "Товар не найден" });
+    const giftOrder = await storage.createGiftOrder({
+      giftCodeId: giftCode.id,
+      senderUserId: mockUserId,
+      recipientUserId: giftCode.userId,
+      productId: product.id,
+      recipientName: recipientName || undefined,
+    });
+    res.status(201).json(giftOrder);
+  });
+
   app.post(api.checkout.telegram.path, async (req, res) => {
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     try {
@@ -323,10 +383,30 @@ export async function registerRoutes(
         0,
       );
 
+      for (const item of input.items) {
+        if (item.isGiftForUser && item.giftCode) {
+          const giftCode = await storage.getGiftCodeByCode(item.giftCode);
+          if (giftCode) {
+            for (let q = 0; q < item.quantity; q++) {
+              await storage.createGiftOrder({
+                giftCodeId: giftCode.id,
+                senderUserId: mockUserId,
+                recipientUserId: giftCode.userId,
+                productId: item.productId,
+                recipientName: item.giftRecipientName,
+              });
+            }
+          }
+        }
+      }
+
       const lines = input.items.map((item) => {
         const base = `• ${item.name} × ${item.quantity} — ${(item.price * item.quantity / 100).toFixed(0)} ₽`;
         if (item.isForBlogger && item.bloggerNickname) {
           return `${base} (для блогера ${item.bloggerNickname})`;
+        }
+        if (item.isGiftForUser && item.giftRecipientName) {
+          return `${base} (подарок для ${item.giftRecipientName})`;
         }
         return base;
       });
@@ -342,10 +422,10 @@ export async function registerRoutes(
 
       const token = process.env.TELEGRAM_BOT_TOKEN;
       if (!token) {
-        return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN is not set" });
+        return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN не настроен. Обратитесь к администратору." });
       }
 
-      const chatId = "@CEO_PE";
+      const chatId = process.env.TELEGRAM_ORDER_CHAT_ID || "@CEO_PE";
       const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -355,8 +435,12 @@ export async function registerRoutes(
         }),
       });
 
+      const tgData = await tgRes.json().catch(() => ({}));
       if (!tgRes.ok) {
-        return res.status(500).json({ message: "Failed to send Telegram message" });
+        const desc = tgData?.description || tgRes.statusText || "Ошибка Telegram";
+        return res.status(502).json({
+          message: `Не удалось отправить заказ в Telegram: ${desc}. Проверьте TELEGRAM_BOT_TOKEN и что бот добавлен в чат/канал.`,
+        });
       }
 
       return res.json({ message: "Заказ отправлен в Telegram" });
@@ -400,6 +484,38 @@ export async function registerRoutes(
     const result = await storage.confirmReferralBonus(id);
     if (!result.ok) return res.status(400).json({ message: result.message });
     res.json({ message: "500 баллов выданы рефереру" });
+  });
+
+  app.get("/api/admin/orders/:id", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const order = await storage.getOrder(id);
+    if (!order) return res.status(404).json({ message: "Заказ не найден" });
+    const user = await storage.getUser(order.userId);
+    const referrer = order.referrerId ? await storage.getUser(order.referrerId) : null;
+    const product = await storage.getProduct(order.productId);
+    res.json({
+      ...order,
+      user: user
+        ? {
+            id: user.id,
+            username: user.username,
+            telegramId: user.telegramId,
+            tgUsername: user.tgUsername,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            referralCode: user.referralCode,
+          }
+        : null,
+      referrer: referrer
+        ? {
+            id: referrer.id,
+            username: referrer.username,
+            referralCode: referrer.referralCode,
+          }
+        : null,
+      product: product || null,
+    });
   });
 
   app.post("/api/admin/upload", (req, res) => {
@@ -518,6 +634,61 @@ export async function registerRoutes(
       })
     );
     res.json(withDetails);
+  });
+
+  app.post("/api/admin/users/:id/send-message", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const { text } = req.body || {};
+    if (typeof text !== "string" || !text.trim()) {
+      return res.status(400).json({ message: "Текст сообщения обязателен" });
+    }
+    const user = await storage.getUser(id);
+    if (!user) return res.status(404).json({ message: "Пользователь не найден" });
+    if (user.telegramId == null) {
+      return res.status(400).json({ message: "У пользователя нет Telegram (не входил через TG)" });
+    }
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN не настроен" });
+    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: user.telegramId,
+        text: text.trim(),
+      }),
+    });
+    const tgData = await tgRes.json().catch(() => ({}));
+    if (!tgRes.ok) {
+      return res.status(502).json({
+        message: tgData?.description || "Не удалось отправить сообщение в Telegram",
+      });
+    }
+    res.json({ message: "Сообщение отправлено" });
+  });
+
+  app.put("/api/admin/users/:id", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const { points } = req.body || {};
+    if (typeof points !== "number" || points < 0) {
+      return res.status(400).json({ message: "Баллы должны быть числом >= 0" });
+    }
+    const u = await storage.updateUserPoints(id, points);
+    if (!u) return res.status(404).json({ message: "Пользователь не найден" });
+    res.json(u);
+  });
+
+  app.get("/api/admin/gift-codes", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const list = await storage.getGiftCodes();
+    res.json(list);
+  });
+
+  app.get("/api/admin/gift-orders", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const list = await storage.getGiftOrders();
+    res.json(list);
   });
 
   // Seed database on startup

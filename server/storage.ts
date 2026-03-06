@@ -5,11 +5,15 @@ import {
   bloggers,
   orders,
   bloggerGifts,
+  giftCodes,
+  giftOrders,
   type User,
   type Product,
   type Blogger,
   type Order,
   type BloggerGift,
+  type GiftCode,
+  type GiftOrder,
   type CreateOrderRequest,
   type CreateBloggerGiftRequest,
 } from "@shared/schema";
@@ -60,10 +64,27 @@ export const storage = {
     return u;
   },
 
-  async getProducts(category?: string, isFree?: boolean): Promise<Product[]> {
+  async getProducts(
+    category?: string,
+    isFree?: boolean,
+    priceFrom?: number,
+    priceTo?: number,
+    search?: string
+  ): Promise<Product[]> {
     let list = await db.select().from(products);
     if (category) list = list.filter((p) => p.category === category);
     if (isFree) list = list.filter((p) => p.pointsPrice != null);
+    if (priceFrom != null) list = list.filter((p) => p.price >= priceFrom);
+    if (priceTo != null) list = list.filter((p) => p.price <= priceTo);
+    if (search?.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      );
+    }
     return list;
   },
 
@@ -153,5 +174,55 @@ export const storage = {
 
   async getReferralsByReferrerId(referrerId: number): Promise<User[]> {
     return await db.select().from(users).where(eq(users.referrerId, referrerId));
+  },
+
+  // Gift codes
+  async createGiftCode(userId: number, code: string): Promise<GiftCode> {
+    const [g] = await db.insert(giftCodes).values({ userId, code }).returning();
+    return g;
+  },
+
+  async getGiftCodeByCode(code: string): Promise<GiftCode | undefined> {
+    const [g] = await db.select().from(giftCodes).where(eq(giftCodes.code, code.toUpperCase().trim()));
+    return g;
+  },
+
+  async getGiftCodesByUserId(userId: number): Promise<GiftCode[]> {
+    return await db.select().from(giftCodes).where(eq(giftCodes.userId, userId)).orderBy(desc(giftCodes.createdAt));
+  },
+
+  async createGiftOrder(data: {
+    giftCodeId: number;
+    senderUserId: number;
+    recipientUserId: number;
+    productId: number;
+    recipientName?: string;
+  }): Promise<GiftOrder> {
+    const [o] = await db.insert(giftOrders).values({ ...data, status: "pending" }).returning();
+    return o;
+  },
+
+  async getGiftOrders(): Promise<(GiftOrder & { giftCode?: GiftCode; sender?: User; recipient?: User; product?: Product })[]> {
+    const list = await db.select().from(giftOrders).orderBy(desc(giftOrders.createdAt));
+    return Promise.all(
+      list.map(async (o) => {
+        const gc = await db.select().from(giftCodes).where(eq(giftCodes.id, o.giftCodeId)).then((r) => r[0]);
+        const sender = await this.getUser(o.senderUserId);
+        const recipient = await this.getUser(o.recipientUserId);
+        const product = await this.getProduct(o.productId);
+        return { ...o, giftCode: gc, sender: sender ?? undefined, recipient: recipient ?? undefined, product: product ?? undefined };
+      })
+    );
+  },
+
+  async getGiftCodes(): Promise<(GiftCode & { user?: User; ordersCount?: number })[]> {
+    const list = await db.select().from(giftCodes).orderBy(desc(giftCodes.createdAt));
+    return Promise.all(
+      list.map(async (gc) => {
+        const user = await this.getUser(gc.userId);
+        const orders = await db.select().from(giftOrders).where(eq(giftOrders.giftCodeId, gc.id));
+        return { ...gc, user: user ?? undefined, ordersCount: orders.length };
+      })
+    );
   },
 };

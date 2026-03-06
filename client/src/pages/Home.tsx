@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar, BottomNav } from "@/components/Navigation";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductDetailDialog } from "@/components/ProductDetailDialog";
 import { useProducts } from "@/hooks/use-products";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { CartBar } from "@/components/CartBar";
+import { Input } from "@/components/ui/input";
+import type { Product } from "@shared/schema";
 
 const CATEGORIES = [
   { id: "all", label: "Вся магия" },
@@ -19,7 +22,17 @@ const CATEGORIES = [
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("all");
-  const { data: products, isLoading } = useProducts(activeTab === "all" ? undefined : activeTab);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [priceFrom, setPriceFrom] = useState<string>("");
+  const [priceTo, setPriceTo] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const { data: products, isLoading } = useProducts(
+    activeTab === "all" ? undefined : activeTab,
+    undefined,
+    priceFrom ? parseInt(priceFrom, 10) : undefined,
+    priceTo ? parseInt(priceTo, 10) : undefined,
+    search || undefined
+  );
   const { data: user } = useUser();
   const { toast } = useToast();
   const { addItem } = useCart();
@@ -60,7 +73,7 @@ export default function Home() {
       </div>
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto no-scrollbar gap-3 mb-8 pb-2">
+      <div className="flex overflow-x-auto no-scrollbar gap-3 mb-4 pb-2">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
@@ -81,6 +94,33 @@ export default function Home() {
         ))}
       </div>
 
+      {/* Filter: price + search */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="relative flex-1 min-w-[140px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Поиск..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-background"
+          />
+        </div>
+        <Input
+          type="number"
+          placeholder="Цена от (₽)"
+          value={priceFrom}
+          onChange={(e) => setPriceFrom(e.target.value)}
+          className="w-28 bg-background"
+        />
+        <Input
+          type="number"
+          placeholder="Цена до (₽)"
+          value={priceTo}
+          onChange={(e) => setPriceTo(e.target.value)}
+          className="w-28 bg-background"
+        />
+      </div>
+
       {/* Grid */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
@@ -97,6 +137,7 @@ export default function Home() {
                 key={product.id} 
                 product={product} 
                 onAction={() => handlePurchase(product.id)}
+                onOpenDetail={() => setDetailProduct(product)}
                 hasReferralDiscount={!!user?.referrerId}
               />
             ))}
@@ -108,6 +149,19 @@ export default function Home() {
           )}
         </motion.div>
       )}
+
+      <ProductDetailDialog
+        product={detailProduct}
+        open={!!detailProduct}
+        onOpenChange={(open) => !open && setDetailProduct(null)}
+        onAddToCart={() => {
+          if (detailProduct) {
+            addItem(detailProduct);
+            toast({ title: "В корзине", description: `${detailProduct.name} добавлен в корзину.` });
+          }
+        }}
+        hasReferralDiscount={!!user?.referrerId}
+      />
 
       <CartBar />
       <BottomNav />

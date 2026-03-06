@@ -13,10 +13,19 @@ import {
   Gift,
   User,
   X,
+  MessageCircle,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const ADMIN_KEY = "admin_secret";
 
@@ -27,9 +36,25 @@ type Order = {
   referrerId: number | null;
   referralBonusGiven: number;
   status: string;
+  paymentMethod?: string;
+  createdAt?: string;
   user: { id: number; username: string } | null;
   referrer: { id: number; username: string; referralCode: string } | null;
   product: { id: number; name: string } | null;
+};
+
+type OrderDetail = Order & {
+  user: {
+    id: number;
+    username: string;
+    telegramId: number | null;
+    tgUsername: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    referralCode: string;
+  } | null;
+  referrer: { id: number; username: string; referralCode: string } | null;
+  product: Product | null;
 };
 
 type Product = {
@@ -110,9 +135,17 @@ export default function Admin() {
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"orders" | "products" | "bonus" | "bloggers" | "users">("orders");
+  const [tab, setTab] = useState<"orders" | "products" | "bonus" | "bloggers" | "users" | "gift">("orders");
+  const [giftCodes, setGiftCodes] = useState<any[]>([]);
+  const [giftOrders, setGiftOrders] = useState<any[]>([]);
+  const [editingUserPoints, setEditingUserPoints] = useState<string>("");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingBlogger, setEditingBlogger] = useState<Blogger | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
+  const [userMessageText, setUserMessageText] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -190,6 +223,24 @@ export default function Admin() {
       .finally(() => setLoading(false));
   };
 
+  const loadGiftCodes = () => {
+    if (!savedSecret) return;
+    setLoading(true);
+    fetchAdmin<any[]>("/api/admin/gift-codes", savedSecret)
+      .then(setGiftCodes)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
+  const loadGiftOrders = () => {
+    if (!savedSecret) return;
+    setLoading(true);
+    fetchAdmin<any[]>("/api/admin/gift-orders", savedSecret)
+      .then(setGiftOrders)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     if (!savedSecret) return;
     if (tab === "orders") loadOrders();
@@ -197,7 +248,25 @@ export default function Admin() {
     if (tab === "bonus") loadBonusProducts();
     if (tab === "bloggers") loadBloggers();
     if (tab === "users") loadUsers();
+    if (tab === "gift") {
+      loadGiftCodes();
+      loadGiftOrders();
+    }
   }, [savedSecret, tab]);
+
+  useEffect(() => {
+    if (!savedSecret || !selectedOrderId) {
+      setOrderDetail(null);
+      return;
+    }
+    fetchAdmin<OrderDetail>(`/api/admin/orders/${selectedOrderId}`, savedSecret)
+      .then(setOrderDetail)
+      .catch(() => setOrderDetail(null));
+  }, [savedSecret, selectedOrderId]);
+
+  useEffect(() => {
+    if (selectedUser) setEditingUserPoints(String(selectedUser.points));
+  }, [selectedUser]);
 
   const confirmReferral = (orderId: number) => {
     if (!savedSecret) return;
@@ -356,7 +425,7 @@ export default function Admin() {
     );
   }
 
-  if (loading && orders.length === 0 && products.length === 0 && bloggers.length === 0 && users.length === 0) {
+  if (loading && orders.length === 0 && products.length === 0 && bloggers.length === 0 && users.length === 0 && giftCodes.length === 0 && giftOrders.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -481,6 +550,7 @@ export default function Admin() {
             ["bonus", "Товары за баллы", Gift],
             ["bloggers", "Блогеры", Users],
             ["users", "Пользователи", User],
+            ["gift", "Коды подарков", KeyRound],
           ] as const
         ).map(([t, label, Icon]) => (
           <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)}>
@@ -496,9 +566,11 @@ export default function Admin() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Обновить"}
           </Button>
           {orders.map((o) => (
-            <div
+            <button
+              type="button"
               key={o.id}
-              className="glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4"
+              onClick={() => setSelectedOrderId(o.id)}
+              className="w-full text-left glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 hover:ring-2 hover:ring-primary/30 transition-all"
             >
               <div>
                 <div className="font-medium">Заказ #{o.id}</div>
@@ -512,16 +584,194 @@ export default function Admin() {
                 )}
               </div>
               {o.referrerId && o.referralBonusGiven === 0 && (
-                <Button onClick={() => confirmReferral(o.id)} disabled={loading} className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    confirmReferral(o.id);
+                  }}
+                  disabled={loading}
+                  className="flex items-center gap-2"
+                >
                   <CheckCircle2 className="w-4 h-4" />
                   Выдать 500 баллов рефереру
                 </Button>
               )}
               {o.referralBonusGiven === 1 && <span className="text-sm text-green-600">Бонус выдан</span>}
-            </div>
+            </button>
           ))}
         </div>
       )}
+
+      {/* Диалог детали заказа */}
+      <Dialog open={!!selectedOrderId} onOpenChange={(open) => !open && setSelectedOrderId(null)}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Заказ #{orderDetail?.id ?? selectedOrderId}</DialogTitle>
+          </DialogHeader>
+          {orderDetail ? (
+            <div className="space-y-4 text-sm">
+              <div>
+                <strong>Пользователь:</strong>
+                <div className="mt-1 text-muted-foreground">
+                  {orderDetail.user ? (
+                    <>
+                      {orderDetail.user.tgUsername ? `@${orderDetail.user.tgUsername}` : orderDetail.user.username}
+                      {orderDetail.user.firstName && ` (${orderDetail.user.firstName} ${orderDetail.user.lastName || ""})`.trim()}
+                      <br />
+                      ID: {orderDetail.user.id} | TG ID: {orderDetail.user.telegramId ?? "—"} | Промокод: {orderDetail.user.referralCode}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </div>
+              </div>
+              <div>
+                <strong>Товар:</strong>
+                <div className="mt-1">
+                  {orderDetail.product ? (
+                    <>
+                      <div className="font-medium">{orderDetail.product.name}</div>
+                      <div className="text-muted-foreground">{orderDetail.product.description}</div>
+                      <div className="mt-1">
+                        {(orderDetail.product.price / 100).toFixed(0)} ₽
+                        {orderDetail.product.pointsPrice != null && ` / ${orderDetail.product.pointsPrice} баллов`}
+                      </div>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </div>
+              </div>
+              <div>
+                <strong>Оплата:</strong> {orderDetail.paymentMethod === "points" ? "баллы" : "наличные"}
+              </div>
+              <div>
+                <strong>Промокод использован:</strong>{" "}
+                {orderDetail.referrerId ? (
+                  <>Да — привёл {orderDetail.referrer?.username} (код {orderDetail.referrer?.referralCode})</>
+                ) : (
+                  "Нет"
+                )}
+              </div>
+              {orderDetail.referrerId && (
+                <div>
+                  <strong>Бонус рефереру:</strong>{" "}
+                  {orderDetail.referralBonusGiven ? "Выдан" : "Не выдан"}
+                </div>
+              )}
+              <div>
+                <strong>Статус:</strong> {orderDetail.status}
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог написать пользователю + редактировать баллы */}
+      <Dialog
+        open={!!selectedUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedUser(null);
+            setUserMessageText("");
+            setEditingUserPoints("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedUser?.tgUsername ? `@${selectedUser.tgUsername}` : selectedUser?.username}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-6">
+              <div>
+                <Label>Баллы</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    type="number"
+                    value={editingUserPoints === "" ? selectedUser.points : editingUserPoints}
+                    onChange={(e) => setEditingUserPoints(e.target.value)}
+                    min={0}
+                    className="w-24"
+                  />
+                  <Button
+                    onClick={() => {
+                      if (!savedSecret || !selectedUser) return;
+                      const pts = editingUserPoints === "" ? selectedUser.points : parseInt(editingUserPoints, 10);
+                      if (isNaN(pts) || pts < 0) {
+                        setError("Введите число >= 0");
+                        return;
+                      }
+                      fetchAdmin(`/api/admin/users/${selectedUser.id}`, savedSecret, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ points: pts }),
+                      })
+                        .then(() => {
+                          setSelectedUser({ ...selectedUser, points: pts });
+                          loadUsers();
+                        })
+                        .catch((err) => setError(err.message));
+                    }}
+                  >
+                    Сохранить баллы
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label>Написать в Telegram</Label>
+                <div className="text-sm text-muted-foreground mt-1">
+                  {selectedUser.telegramId ? (
+                    "Сообщение придёт в личные сообщения."
+                  ) : (
+                    "У пользователя нет Telegram. Отправка недоступна."
+                  )}
+                </div>
+                {selectedUser.telegramId && (
+                  <>
+                    <Textarea
+                      value={userMessageText}
+                      onChange={(e) => setUserMessageText(e.target.value)}
+                      placeholder="Введите сообщение..."
+                      rows={4}
+                      className="resize-none mt-2"
+                    />
+                    <Button
+                      onClick={() => {
+                        if (!savedSecret || !selectedUser || !userMessageText.trim()) return;
+                        setSendingMessage(true);
+                        fetchAdmin(`/api/admin/users/${selectedUser.id}/send-message`, savedSecret, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ text: userMessageText.trim() }),
+                        })
+                          .then(() => {
+                            setError("");
+                            setUserMessageText("");
+                          })
+                          .catch((err) => setError(err.message))
+                          .finally(() => setSendingMessage(false));
+                      }}
+                      disabled={sendingMessage || !userMessageText.trim()}
+                      className="mt-2"
+                    >
+                      {sendingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                      Отправить
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {tab === "products" && (
         <div className="space-y-6">
@@ -737,7 +987,12 @@ export default function Admin() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Обновить"}
           </Button>
           {users.map((u) => (
-            <div key={u.id} className="glass rounded-2xl p-4 space-y-3">
+            <button
+              type="button"
+              key={u.id}
+              onClick={() => setSelectedUser(u)}
+              className="w-full text-left glass rounded-2xl p-4 space-y-3 hover:ring-2 hover:ring-primary/30 transition-all"
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {u.avatarUrl && (
@@ -776,8 +1031,61 @@ export default function Admin() {
                   {u.referrals.map((r) => r.username).join(", ")}
                 </div>
               )}
-            </div>
+            </button>
           ))}
+        </div>
+      )}
+
+      {tab === "gift" && (
+        <div className="space-y-6">
+          <Button
+            onClick={() => {
+              loadGiftCodes();
+              loadGiftOrders();
+            }}
+            variant="outline"
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Обновить"}
+          </Button>
+          <div>
+            <h3 className="font-display font-bold text-xl mb-3">Коды подарков (кто создал)</h3>
+            <div className="space-y-2">
+              {giftCodes.map((gc) => (
+                <div key={gc.id} className="glass rounded-xl p-4 flex justify-between items-center">
+                  <div>
+                    <code className="font-mono font-bold text-primary">{gc.code}</code>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Создал: {gc.user?.tgUsername ? `@${gc.user.tgUsername}` : gc.user?.username ?? "—"} (ID {gc.userId}) · Подарков: {gc.ordersCount ?? 0}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {gc.createdAt ? new Date(gc.createdAt).toLocaleString("ru") : ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {giftCodes.length === 0 && <p className="text-muted-foreground">Нет кодов</p>}
+            </div>
+          </div>
+          <div>
+            <h3 className="font-display font-bold text-xl mb-3">Подарки (кто кому отправил)</h3>
+            <div className="space-y-2">
+              {giftOrders.map((go) => (
+                <div key={go.id} className="glass rounded-xl p-4">
+                  <div className="font-medium">
+                    {go.sender?.tgUsername ? `@${go.sender.tgUsername}` : go.sender?.username ?? "—"} → {go.recipient?.tgUsername ? `@${go.recipient.tgUsername}` : go.recipient?.username ?? "—"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Товар: {go.product?.name ?? "—"} · {(go.product?.price ?? 0) / 100} ₽
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {go.createdAt ? new Date(go.createdAt).toLocaleString("ru") : ""}
+                  </div>
+                </div>
+              ))}
+              {giftOrders.length === 0 && <p className="text-muted-foreground">Нет подарков</p>}
+            </div>
+          </div>
         </div>
       )}
 

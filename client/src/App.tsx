@@ -9,6 +9,7 @@ import Home from "@/pages/Home";
 import PointsShop from "@/pages/PointsShop";
 import BloggerGifts from "@/pages/BloggerGifts";
 import Profile from "@/pages/Profile";
+import GiftByCode from "@/pages/GiftByCode";
 import MockLogin from "@/pages/MockLogin";
 import Admin from "@/pages/Admin";
 
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/points" component={() => <ProtectedRoute component={PointsShop} />} />
       <Route path="/bloggers" component={() => <ProtectedRoute component={BloggerGifts} />} />
       <Route path="/profile" component={() => <ProtectedRoute component={Profile} />} />
+      <Route path="/gift/:code" component={() => <ProtectedRoute component={GiftByCode} />} />
       <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>

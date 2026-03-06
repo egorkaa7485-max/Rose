@@ -4,10 +4,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ShoppingCart } from "lucide-react";
+import { Loader2, ShoppingCart, Trash2 } from "lucide-react";
 
 export function CartBar() {
-  const { items, total, clear } = useCart();
+  const { items, total, clear, removeItem } = useCart();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -25,16 +25,18 @@ export function CartBar() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.message || "Ошибка при отправке заказа");
+        const msg = data?.message || "Ошибка при отправке заказа";
+        throw new Error(msg);
       }
       clear();
       setOpen(false);
-      toast({ title: "Заказ отправлен", description: "Мы написали @CEO_PE в Telegram." });
+      toast({ title: "Заказ отправлен", description: "Мы написали вам в Telegram." });
       window.location.href = "https://t.me/CEO_PE";
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Попробуйте ещё раз.";
       toast({
-        title: "Не удалось отправить заказ",
-        description: e?.message || "Попробуйте ещё раз.",
+        title: "Не удалось отправить заказ в Telegram",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -63,7 +65,7 @@ export function CartBar() {
           <div className="mt-4 space-y-3 overflow-y-auto max-h-[45vh] pr-1">
             {items.map((item, idx) => (
               <div
-                key={`${item.productId}-${idx}-${item.bloggerNickname || "self"}`}
+                key={`${item.productId}-${idx}-${item.bloggerNickname || item.giftCode || "self"}`}
                 className="flex items-center gap-3"
               >
                 <div className="w-14 h-14 rounded-2xl overflow-hidden bg-muted flex-shrink-0">
@@ -74,17 +76,32 @@ export function CartBar() {
                     loading="lazy"
                   />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">{item.name}</div>
                   {item.isForBlogger && item.bloggerNickname && (
                     <div className="text-xs text-primary">
                       Подарок для блогера {item.bloggerNickname}
                     </div>
                   )}
+                  {item.isGiftForUser && item.giftRecipientName && (
+                    <div className="text-xs text-primary">
+                      Подарок для {item.giftRecipientName}
+                    </div>
+                  )}
                   <div className="text-xs text-muted-foreground">
                     {item.quantity} × {(item.price / 100).toFixed(0)} ₽
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeItem(idx)}
+                  aria-label="Удалить из корзины"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>

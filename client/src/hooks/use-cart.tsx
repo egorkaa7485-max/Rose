@@ -9,12 +9,25 @@ export type CartItem = {
   quantity: number;
   isForBlogger?: boolean;
   bloggerNickname?: string;
+  isGiftForUser?: boolean;
+  giftRecipientName?: string;
+  giftCode?: string;
 };
 
 type CartContextValue = {
   items: CartItem[];
   total: number;
-  addItem: (product: Product, options?: { isForBlogger?: boolean; bloggerNickname?: string }) => void;
+  addItem: (
+    product: Product,
+    options?: {
+      isForBlogger?: boolean;
+      bloggerNickname?: string;
+      isGiftForUser?: boolean;
+      giftRecipientName?: string;
+      giftCode?: string;
+    }
+  ) => void;
+  removeItem: (index: number) => void;
   clear: () => void;
 };
 
@@ -29,7 +42,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         (i) =>
           i.productId === product.id &&
           !!i.isForBlogger === !!options?.isForBlogger &&
-          i.bloggerNickname === options?.bloggerNickname,
+          i.bloggerNickname === options?.bloggerNickname &&
+          !!i.isGiftForUser === !!options?.isGiftForUser &&
+          i.giftCode === options?.giftCode,
       );
       if (existing) {
         return prev.map((i) =>
@@ -46,6 +61,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           quantity: 1,
           isForBlogger: options?.isForBlogger,
           bloggerNickname: options?.bloggerNickname,
+          isGiftForUser: options?.isGiftForUser,
+          giftRecipientName: options?.giftRecipientName,
+          giftCode: options?.giftCode,
         },
       ];
     });
@@ -53,13 +71,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = () => setItems([]);
 
+  const removeItem = (index: number) => {
+    setItems((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
+  };
+
   const total = useMemo(
     () => items.reduce((sum, i) => sum + i.price * i.quantity, 0),
     [items],
   );
 
   const value = useMemo(
-    () => ({ items, total, addItem, clear }),
+    () => ({ items, total, addItem, removeItem, clear }),
     [items, total],
   );
 

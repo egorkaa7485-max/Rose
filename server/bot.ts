@@ -13,10 +13,16 @@ const bot = new TelegramBot(token, { polling: true });
 
 bot.onText(/\/start/, (msg: TelegramBot.Message) => {
   const chatId = msg.chat.id;
+  const firstName = msg.from?.first_name || "";
+  const greeting = firstName
+    ? `Привет, ${firstName}! 👋`
+    : "Привет! 👋";
   bot.sendMessage(
     chatId,
-    "🌸 Заходи в мини-апп и получи подарок второй половинке бесплатно!\n\n" +
-      "Bloom & Bliss — цветочный бутик с подарками и сюрпризами.",
+    greeting +
+      "\n\n🌸 Заходи в мини-апп Bloom & Bliss — цветочный бутик с подарками и сюрпризами для особенных людей.\n\n" +
+      "Там ты найдёшь букеты, торты, подарки к 8 Марта и возможность отправить сюрприз любимому блогеру. " +
+      "Оформи заказ — мы всё красиво соберём и доставим.",
     {
       reply_markup: {
         inline_keyboard: [

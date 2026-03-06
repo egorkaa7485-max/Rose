@@ -51,6 +51,26 @@ export const bloggerGifts = pgTable("blogger_gifts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Коды для подарков: пользователь создаёт код, по нему другие могут отправить ему подарок
+export const giftCodes = pgTable("gift_codes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(), // получатель подарков (владелец кода)
+  code: text("code").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Заказы подарков по коду: кто отправил, кому, какой товар
+export const giftOrders = pgTable("gift_orders", {
+  id: serial("id").primaryKey(),
+  giftCodeId: integer("gift_code_id").notNull(),
+  senderUserId: integer("sender_user_id").notNull(),
+  recipientUserId: integer("recipient_user_id").notNull(),
+  productId: integer("product_id").notNull(),
+  recipientName: text("recipient_name"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, points: true, referralCode: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, status: true });
@@ -62,6 +82,8 @@ export type Product = typeof products.$inferSelect;
 export type Blogger = typeof bloggers.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type BloggerGift = typeof bloggerGifts.$inferSelect;
+export type GiftCode = typeof giftCodes.$inferSelect;
+export type GiftOrder = typeof giftOrders.$inferSelect;
 
 // Request/Response types
 export type CreateOrderRequest = z.infer<typeof insertOrderSchema>;

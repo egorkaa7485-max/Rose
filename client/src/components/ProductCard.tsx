@@ -10,9 +10,10 @@ interface ProductCardProps {
   actionText?: string;
   usePoints?: boolean;
   hasReferralDiscount?: boolean;
+  onOpenDetail?: () => void;
 }
 
-export function ProductCard({ product, onAction, actionText = "Add to Cart", usePoints = false, hasReferralDiscount = false }: ProductCardProps) {
+export function ProductCard({ product, onAction, actionText = "Add to Cart", usePoints = false, hasReferralDiscount = false, onOpenDetail }: ProductCardProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -22,25 +23,36 @@ export function ProductCard({ product, onAction, actionText = "Add to Cart", use
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-accent/40 to-transparent rounded-full -mr-10 -mt-10 blur-xl z-0 transition-transform group-hover:scale-150 duration-700" />
       
-      <div className="relative z-10 aspect-square rounded-[1.5rem] overflow-hidden mb-4 shadow-sm bg-muted/50">
+      <button
+        type="button"
+        className="relative z-10 aspect-square rounded-[1.5rem] overflow-hidden mb-4 shadow-sm bg-muted/50 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
+        onClick={onOpenDetail}
+        aria-label={`Открыть описание: ${product.name}`}
+      >
         <img 
           src={product.imageUrl} 
           alt={product.name}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           loading="lazy"
         />
-        <button className="absolute top-3 right-3 w-8 h-8 glass rounded-full flex items-center justify-center text-foreground hover:text-primary transition-colors">
+        <span className="absolute top-3 right-3 w-8 h-8 glass rounded-full flex items-center justify-center text-foreground hover:text-primary transition-colors pointer-events-none">
           <Heart className="w-4 h-4" />
-        </button>
-      </div>
+        </span>
+      </button>
       
       <div className="flex-1 flex flex-col relative z-10 px-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-primary/80 mb-1">
-          {product.category}
-        </div>
-        <h3 className="font-display font-bold text-lg leading-tight mb-2 text-foreground">
-          {product.name}
-        </h3>
+        <button
+          type="button"
+          className="text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-lg -mx-2 px-2"
+          onClick={onOpenDetail}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-primary/80 mb-1">
+            {product.category}
+          </div>
+          <h3 className="font-display font-bold text-lg leading-tight mb-2 text-foreground">
+            {product.name}
+          </h3>
+        </button>
         
         <div className="mt-auto pt-4 flex items-center justify-between">
           <div className="flex flex-col">
@@ -65,8 +77,9 @@ export function ProductCard({ product, onAction, actionText = "Add to Cart", use
           </div>
           
           <button 
-            onClick={onAction}
+            onClick={(e) => { e.stopPropagation(); onAction?.(); }}
             className="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-accent text-white flex items-center justify-center shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
+            aria-label="Добавить в корзину"
           >
             <Plus className="w-5 h-5" />
           </button>

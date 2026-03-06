@@ -2,12 +2,15 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar, BottomNav } from "@/components/Navigation";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductDetailDialog } from "@/components/ProductDetailDialog";
 import { useBloggers, useSendBloggerGift } from "@/hooks/use-bloggers";
 import { useProducts } from "@/hooks/use-products";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, Gift } from "lucide-react";
+import { Loader2, CheckCircle2, Gift, Search } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
+import { Input } from "@/components/ui/input";
+import type { Product } from "@shared/schema";
 
 function formatNickname(nickname: string) {
   const trimmed = nickname?.trim() ?? "";
@@ -16,9 +19,19 @@ function formatNickname(nickname: string) {
 
 export default function BloggerGifts() {
   const [selectedBloggerId, setSelectedBloggerId] = useState<number | null>(null);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [priceFrom, setPriceFrom] = useState<string>("");
+  const [priceTo, setPriceTo] = useState<string>("");
+  const [search, setSearch] = useState("");
   
   const { data: bloggers, isLoading: loadingBloggers } = useBloggers();
-  const { data: products, isLoading: loadingProducts } = useProducts();
+  const { data: products, isLoading: loadingProducts } = useProducts(
+    undefined,
+    undefined,
+    priceFrom ? parseInt(priceFrom, 10) : undefined,
+    priceTo ? parseInt(priceTo, 10) : undefined,
+    search || undefined
+  );
   const { data: user } = useUser();
   const { mutate: sendGift, isPending } = useSendBloggerGift();
   const { toast } = useToast();
@@ -127,6 +140,31 @@ export default function BloggerGifts() {
             exit={{ opacity: 0, height: 0 }}
           >
             <h3 className="font-display font-bold text-xl mb-4 ml-2">2. Выберите подарок</h3>
+            <div className="flex flex-wrap gap-3 mb-4">
+              <div className="relative flex-1 min-w-[140px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Поиск..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 bg-background"
+                />
+              </div>
+              <Input
+                type="number"
+                placeholder="Цена от (₽)"
+                value={priceFrom}
+                onChange={(e) => setPriceFrom(e.target.value)}
+                className="w-28 bg-background"
+              />
+              <Input
+                type="number"
+                placeholder="Цена до (₽)"
+                value={priceTo}
+                onChange={(e) => setPriceTo(e.target.value)}
+                className="w-28 bg-background"
+              />
+            </div>
             {loadingProducts ? (
                <div className="h-40 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : (
@@ -137,6 +175,7 @@ export default function BloggerGifts() {
                     product={product} 
                     actionText="Отправить"
                     onAction={() => handleSendGift(product.id)}
+                    onOpenDetail={() => setDetailProduct(product)}
                     hasReferralDiscount={!!user?.referrerId}
                   />
                 ))}
@@ -145,6 +184,35 @@ export default function BloggerGifts() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ProductDetailDialog
+        product={detailProduct}
+        open={!!detailProduct}
+        onOpenChange={(open) => !open && setDetailProduct(null)}
+        onAddToCart={() => {
+          if (!detailProduct || !selectedBloggerId || !user) return;
+          const blogger = bloggers?.find((b) => b.id === selectedBloggerId);
+          sendGift(
+            { userId: user.id, bloggerId: selectedBloggerId, productId: detailProduct.id },
+            {
+              onSuccess: () => {
+                if (blogger) {
+                  addItem(detailProduct, {
+                    isForBlogger: true,
+                    bloggerNickname: formatNickname(blogger.nickname),
+                  });
+                }
+                toast({
+                  title: "Подарок отправлен! 🎁",
+                  description: "Блогер получит ваш сюрприз, позиция добавлена в корзину.",
+                });
+                setDetailProduct(null);
+              },
+            }
+          );
+        }}
+        hasReferralDiscount={!!user?.referrerId}
+      />
 
       <BottomNav />
     </div>

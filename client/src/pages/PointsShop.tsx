@@ -1,17 +1,31 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { TopBar, BottomNav } from "@/components/Navigation";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductDetailDialog } from "@/components/ProductDetailDialog";
 import { useProducts } from "@/hooks/use-products";
 import { useUser } from "@/hooks/use-user";
 import { useCreateOrder } from "@/hooks/use-orders";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import type { Product } from "@shared/schema";
 
 export default function PointsShop() {
-  const { data: products, isLoading } = useProducts(undefined, "true");
+  const [priceFrom, setPriceFrom] = useState<string>("");
+  const [priceTo, setPriceTo] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const { data: products, isLoading } = useProducts(
+    undefined,
+    "true",
+    priceFrom ? parseInt(priceFrom, 10) : undefined,
+    priceTo ? parseInt(priceTo, 10) : undefined,
+    search || undefined
+  );
   const { data: user } = useUser();
   const { mutate: createOrder } = useCreateOrder();
   const { toast } = useToast();
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
 
   const handlePointsPurchase = (productId: number, price: number | null) => {
     if (!user) {
@@ -52,6 +66,32 @@ export default function PointsShop() {
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="relative flex-1 min-w-[140px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Поиск..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-background"
+          />
+        </div>
+        <Input
+          type="number"
+          placeholder="Цена от (₽)"
+          value={priceFrom}
+          onChange={(e) => setPriceFrom(e.target.value)}
+          className="w-28 bg-background"
+        />
+        <Input
+          type="number"
+          placeholder="Цена до (₽)"
+          value={priceTo}
+          onChange={(e) => setPriceTo(e.target.value)}
+          className="w-28 bg-background"
+        />
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -64,6 +104,7 @@ export default function PointsShop() {
               product={product} 
               usePoints={true}
               onAction={() => handlePointsPurchase(product.id, product.pointsPrice)}
+              onOpenDetail={() => setDetailProduct(product)}
             />
           ))}
           {products?.length === 0 && (
@@ -73,6 +114,19 @@ export default function PointsShop() {
           )}
         </div>
       )}
+
+      <ProductDetailDialog
+        product={detailProduct}
+        open={!!detailProduct}
+        onOpenChange={(open) => !open && setDetailProduct(null)}
+        onAddToCart={() => {
+          if (detailProduct?.pointsPrice && user) {
+            handlePointsPurchase(detailProduct.id, detailProduct.pointsPrice);
+            setDetailProduct(null);
+          }
+        }}
+        usePoints={true}
+      />
 
       <BottomNav />
     </div>

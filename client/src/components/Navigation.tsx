@@ -5,14 +5,9 @@ import { motion } from "framer-motion";
 export function TopBar() {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 glass px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-white font-display font-bold text-lg shadow-sm">
-          B
-        </div>
-        <h1 className="font-display font-bold text-xl text-foreground tracking-tight">
-          Bloom & Bliss
-        </h1>
-      </div>
+      <h1 className="font-display font-bold text-xl text-foreground tracking-tight">
+        Bloom & Bliss
+      </h1>
     </header>
   );
 }
