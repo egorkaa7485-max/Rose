@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar, BottomNav } from "@/components/Navigation";
 import { ProductCard } from "@/components/ProductCard";
@@ -22,6 +22,17 @@ export default function Home() {
   const { mutate: createOrder, isPending } = useCreateOrder();
   const { data: user } = useUser();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!user) return;
+    const shown = sessionStorage.getItem("welcome_shown");
+    if (shown === "1") return;
+    sessionStorage.setItem("welcome_shown", "1");
+    toast({
+      title: "Добро пожаловать!",
+      description: "Выберите букет или подарок — оформим красиво и быстро.",
+    });
+  }, [toast, user]);
 
   const handlePurchase = (productId: number) => {
     if (!user) {

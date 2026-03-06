@@ -8,6 +8,11 @@ import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, Gift } from "lucide-react";
 
+function formatNickname(nickname: string) {
+  const trimmed = nickname?.trim() ?? "";
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+}
+
 export default function BloggerGifts() {
   const [selectedBloggerId, setSelectedBloggerId] = useState<number | null>(null);
   
@@ -62,22 +67,32 @@ export default function BloggerGifts() {
               <button
                 key={blogger.id}
                 onClick={() => setSelectedBloggerId(blogger.id)}
-                className={`relative flex flex-col items-center flex-shrink-0 w-32 gap-2 transition-all duration-300 ${
-                  selectedBloggerId === blogger.id ? "scale-105" : "opacity-70 hover:opacity-100"
+                className={`relative flex-shrink-0 transition-all duration-300 ${
+                  selectedBloggerId === blogger.id ? "scale-[1.02]" : "opacity-80 hover:opacity-100"
                 }`}
               >
-                <div className={`w-28 h-28 rounded-2xl overflow-hidden p-1 transition-all duration-300 ${
-                  selectedBloggerId === blogger.id ? "bg-gradient-to-tr from-primary to-accent shadow-lg shadow-primary/30" : "bg-white/50"
-                }`}>
-                  <img 
-                    src={blogger.avatarUrl} 
-                    alt={blogger.nickname} 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <span className="text-sm font-medium text-center truncate w-full">
-                  @{blogger.nickname}
-                </span>
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass-card rounded-[2rem] p-3 w-40 overflow-hidden"
+                >
+                  <div className="relative z-10 aspect-square rounded-[1.5rem] overflow-hidden mb-3 shadow-sm bg-muted/50">
+                    <img
+                      src={blogger.avatarUrl}
+                      alt={blogger.nickname}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="px-2 pb-1">
+                    <div className="font-display font-bold text-base truncate text-foreground">
+                      {formatNickname(blogger.nickname)}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      Выбрать
+                    </div>
+                  </div>
+                </motion.div>
                 
                 {selectedBloggerId === blogger.id && (
                   <motion.div layoutId="check" className="absolute -top-1 -right-1 bg-white rounded-full text-primary">

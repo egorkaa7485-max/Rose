@@ -41,11 +41,51 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Simple login mock for testing
   app.post("/api/login", async (req, res) => {
-    const { username } = req.body;
-    let user = await storage.getUserByUsername(username);
-    if (!user) {
-      user = await storage.createUser({ username, password: "password" });
+    const { username, telegramId, tgUsername, firstName, lastName, avatarUrl } = req.body ?? {};
+
+    const tgIdNum =
+      telegramId === undefined || telegramId === null ? undefined : Number(telegramId);
+
+    let user =
+      typeof tgIdNum === "number" && Number.isFinite(tgIdNum)
+        ? await storage.getUserByTelegramId(tgIdNum)
+        : undefined;
+
+    if (!user && typeof username === "string" && username.trim()) {
+      user = await storage.getUserByUsername(username.trim());
     }
+
+    const safeUsername =
+      (typeof tgUsername === "string" && tgUsername.trim()) ||
+      (typeof username === "string" && username.trim()) ||
+      (typeof firstName === "string" && firstName.trim()
+        ? `${firstName.trim()}_${tgIdNum ?? "user"}`
+        : `user_${tgIdNum ?? Math.floor(Math.random() * 1_000_000)}`);
+
+    if (!user) {
+      user = await storage.createUser({
+        username: safeUsername,
+        password: "password",
+        telegramId: typeof tgIdNum === "number" && Number.isFinite(tgIdNum) ? tgIdNum : null,
+        tgUsername: typeof tgUsername === "string" ? tgUsername : null,
+        firstName: typeof firstName === "string" ? firstName : null,
+        lastName: typeof lastName === "string" ? lastName : null,
+        avatarUrl: typeof avatarUrl === "string" ? avatarUrl : null,
+        referrerId: null,
+      } as any);
+    } else {
+      // обновляем телеграм-данные при каждом входе (если они пришли)
+      const patch: any = {};
+      if (typeof tgIdNum === "number" && Number.isFinite(tgIdNum)) patch.telegramId = tgIdNum;
+      if (typeof tgUsername === "string") patch.tgUsername = tgUsername;
+      if (typeof firstName === "string") patch.firstName = firstName;
+      if (typeof lastName === "string") patch.lastName = lastName;
+      if (typeof avatarUrl === "string") patch.avatarUrl = avatarUrl;
+      if (Object.keys(patch).length) {
+        user = (await storage.updateUserProfile(user.id, patch)) ?? user;
+      }
+    }
+
     mockUserId = user.id;
     res.json(user);
   });

@@ -27,13 +27,21 @@ export default function MockLogin() {
     fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({
+        username,
+        telegramId: tgUser.id,
+        tgUsername: tgUser.username ?? null,
+        firstName: tgUser.first_name ?? null,
+        lastName: tgUser.last_name ?? null,
+        avatarUrl: tgUser.photo_url ?? null,
+      }),
       credentials: "include",
     })
       .then(async (res) => {
         if (!res.ok) throw new Error("Telegram login failed");
         const user = await res.json();
         queryClient.setQueryData([api.user.me.path], user);
+        sessionStorage.setItem("welcome_shown", "0");
         setLocation("/");
       })
       .catch(() => {

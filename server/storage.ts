@@ -26,6 +26,11 @@ export const storage = {
     return u;
   },
 
+  async getUserByTelegramId(telegramId: number): Promise<User | undefined> {
+    const [u] = await db.select().from(users).where(eq(users.telegramId, telegramId));
+    return u;
+  },
+
   async getUserByReferralCode(code: string): Promise<User | undefined> {
     const [u] = await db.select().from(users).where(eq(users.referralCode, code));
     return u;
@@ -34,6 +39,14 @@ export const storage = {
   async createUser(data: Omit<User, "id" | "points" | "referralCode">): Promise<User> {
     const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     const [u] = await db.insert(users).values({ ...data, referralCode, points: 0 }).returning();
+    return u;
+  },
+
+  async updateUserProfile(
+    id: number,
+    patch: Partial<Pick<User, "tgUsername" | "firstName" | "lastName" | "avatarUrl" | "telegramId">>,
+  ): Promise<User | undefined> {
+    const [u] = await db.update(users).set(patch).where(eq(users.id, id)).returning();
     return u;
   },
 

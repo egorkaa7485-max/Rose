@@ -62,14 +62,29 @@ export default function Profile() {
         <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-accent/30 rounded-full blur-2xl" />
         
         <div className="w-24 h-24 mx-auto bg-gradient-to-br from-primary to-accent rounded-full p-1 shadow-xl shadow-primary/20 mb-4">
-          <div className="w-full h-full bg-white rounded-full flex items-center justify-center font-display font-bold text-3xl text-primary">
-            {user.username.charAt(0).toUpperCase()}
-          </div>
+          {user.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt={user.tgUsername || user.username}
+              className="w-full h-full rounded-full object-cover bg-white"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full bg-white rounded-full flex items-center justify-center font-display font-bold text-3xl text-primary">
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
         
         <h2 className="font-display font-bold text-2xl text-foreground">
-          @{user.username}
+          @{user.tgUsername || user.username}
         </h2>
+
+        {(user.firstName || user.lastName) && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {[user.firstName, user.lastName].filter(Boolean).join(" ")}
+          </p>
+        )}
         
         <div className="mt-6 flex items-center justify-center gap-2 text-amber-500 bg-amber-500/10 py-2 px-4 rounded-full w-max mx-auto">
           <Sparkles className="w-5 h-5" />
