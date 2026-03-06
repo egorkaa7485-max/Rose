@@ -1,11 +1,34 @@
-import type { Express, Request } from "express";
+import express, { type Express, type Request } from "express";
 import type { Server } from "http";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { db } from "./db";
 import { bloggers as bloggersTable, products as productsTable } from "@shared/schema";
 import crypto from "crypto";
+
+const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype);
+    cb(ok ? null : new Error("Только изображения (jpg, png, webp, gif)"), ok);
+  },
+});
 
 // Mock user for simplicity since we don't have real auth set up fully yet
 let mockUserId: number | null = null;
@@ -40,6 +63,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use("/uploads", express.static(UPLOADS_DIR));
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN || "";
 
   function validateTelegramInitData(initData: string): { ok: true; params: URLSearchParams } | { ok: false } {
@@ -377,6 +402,26 @@ export async function registerRoutes(
     res.json({ message: "500 баллов выданы рефереру" });
   });
 
+  app.post("/api/admin/upload", (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    upload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Ошибка загрузки" });
+      const file = (req as any).file;
+      if (!file) return res.status(400).json({ message: "Файл не выбран" });
+      const url = `/uploads/${file.filename}`;
+      res.json({ url });
+    });
+  });
+
+  app.get("/api/admin/products", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const category = req.query.category as string | undefined;
+    const isFreeStr = req.query.isFree as string | undefined;
+    const isFree = isFreeStr === "true";
+    const list = await storage.getProducts(category, isFree);
+    res.json(list);
+  });
+
   app.post("/api/admin/products", async (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
     const { name, description, price, pointsPrice, category, imageUrl } = req.body;
@@ -394,12 +439,85 @@ export async function registerRoutes(
     res.status(201).json(p);
   });
 
+  app.put("/api/admin/products/:id", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const { name, description, price, pointsPrice, category, imageUrl } = req.body;
+    const p = await storage.updateProduct(id, {
+      ...(name != null && { name }),
+      ...(description != null && { description }),
+      ...(price != null && { price: parseInt(price, 10) }),
+      ...(pointsPrice !== undefined && { pointsPrice: pointsPrice ? parseInt(pointsPrice, 10) : null }),
+      ...(category != null && { category }),
+      ...(imageUrl != null && { imageUrl }),
+    });
+    if (!p) return res.status(404).json({ message: "Товар не найден" });
+    res.json(p);
+  });
+
+  app.delete("/api/admin/products/:id", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteProduct(id);
+    if (!ok) return res.status(404).json({ message: "Товар не найден" });
+    res.json({ message: "Удалено" });
+  });
+
+  app.get("/api/admin/bloggers", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const list = await storage.getBloggers();
+    res.json(list);
+  });
+
   app.post("/api/admin/bloggers", async (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
     const { nickname, avatarUrl } = req.body;
     if (!nickname || !avatarUrl) return res.status(400).json({ message: "Missing nickname or avatarUrl" });
     const b = await storage.createBlogger({ nickname, avatarUrl });
     res.status(201).json(b);
+  });
+
+  app.put("/api/admin/bloggers/:id", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const { nickname, avatarUrl } = req.body;
+    const b = await storage.updateBlogger(id, {
+      ...(nickname != null && { nickname }),
+      ...(avatarUrl != null && { avatarUrl }),
+    });
+    if (!b) return res.status(404).json({ message: "Блогер не найден" });
+    res.json(b);
+  });
+
+  app.delete("/api/admin/bloggers/:id", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteBlogger(id);
+    if (!ok) return res.status(404).json({ message: "Блогер не найден" });
+    res.json({ message: "Удалено" });
+  });
+
+  app.get("/api/admin/users", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const list = await storage.getAllUsers();
+    const withDetails = await Promise.all(
+      list.map(async (u) => {
+        const userOrders = await storage.getOrdersByUserId(u.id);
+        const referrals = await storage.getReferralsByReferrerId(u.id);
+        const ordersWithProducts = await Promise.all(
+          userOrders.map(async (o) => {
+            const p = await storage.getProduct(o.productId);
+            return { ...o, product: p };
+          })
+        );
+        return {
+          ...u,
+          orders: ordersWithProducts,
+          referrals,
+        };
+      })
+    );
+    res.json(withDetails);
   });
 
   // Seed database on startup

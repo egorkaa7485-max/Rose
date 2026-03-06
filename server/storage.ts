@@ -114,8 +114,44 @@ export const storage = {
     return p;
   },
 
+  async updateProduct(id: number, data: Partial<Omit<Product, "id">>): Promise<Product | undefined> {
+    const [p] = await db.update(products).set(data).where(eq(products.id, id)).returning();
+    return p;
+  },
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const p = await this.getProduct(id);
+    if (!p) return false;
+    await db.delete(products).where(eq(products.id, id));
+    return true;
+  },
+
   async createBlogger(data: Omit<Blogger, "id">): Promise<Blogger> {
     const [b] = await db.insert(bloggers).values(data).returning();
     return b;
+  },
+
+  async updateBlogger(id: number, data: Partial<Omit<Blogger, "id">>): Promise<Blogger | undefined> {
+    const [b] = await db.update(bloggers).set(data).where(eq(bloggers.id, id)).returning();
+    return b;
+  },
+
+  async deleteBlogger(id: number): Promise<boolean> {
+    const [b] = await db.select().from(bloggers).where(eq(bloggers.id, id));
+    if (!b) return false;
+    await db.delete(bloggers).where(eq(bloggers.id, id));
+    return true;
+  },
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  },
+
+  async getOrdersByUserId(userId: number): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+  },
+
+  async getReferralsByReferrerId(referrerId: number): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.referrerId, referrerId));
   },
 };

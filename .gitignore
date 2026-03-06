@@ -3,5 +3,6 @@ dist
 .env
 .DS_Store
 server/public
+uploads
 vite.config.ts.*
 *.tar.gz
