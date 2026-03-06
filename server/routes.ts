@@ -92,40 +92,70 @@ export async function registerRoutes(
 
   app.post(api.telegram.login.path, async (req, res) => {
     try {
-      const input = api.telegram.login.input.parse(req.body);
-      const validated = validateTelegramInitData(input.initData);
-      if (!validated.ok) return res.status(400).json({ message: "Telegram initData invalid" });
+      if (!botToken) {
+        return res.status(503).json({
+          message: "Вход через Telegram временно недоступен. Укажите TELEGRAM_BOT_TOKEN в настройках.",
+        });
+      }
+      const body = req.body ?? {};
+      const input = api.telegram.login.input.safeParse(body);
+      if (!input.success) {
+        const msg = input.error.errors[0]?.message ?? "Требуется initData от Telegram WebApp";
+        return res.status(400).json({ message: msg });
+      }
+      const validated = validateTelegramInitData(input.data.initData);
+      if (!validated.ok) {
+        return res.status(400).json({ message: "Telegram initData недействителен или истёк. Откройте приложение из бота." });
+      }
 
       const userJson = validated.params.get("user");
-      if (!userJson) return res.status(400).json({ message: "Missing user in initData" });
+      if (!userJson) return res.status(400).json({ message: "Нет данных пользователя в initData" });
 
-      const tgUser = JSON.parse(userJson) as {
-        id: number;
-        username?: string;
-        first_name?: string;
-        last_name?: string;
-        photo_url?: string;
-      };
+      let tgUser: { id: number; username?: string; first_name?: string; last_name?: string; photo_url?: string };
+      try {
+        tgUser = JSON.parse(userJson) as typeof tgUser;
+      } catch {
+        return res.status(400).json({ message: "Неверный формат данных пользователя" });
+      }
 
       const telegramId = Number(tgUser.id);
-      if (!Number.isFinite(telegramId)) return res.status(400).json({ message: "Invalid telegram id" });
+      if (!Number.isFinite(telegramId)) return res.status(400).json({ message: "Неверный Telegram ID" });
 
       let user = await storage.getUserByTelegramId(telegramId);
-      const username =
-        tgUser.username ||
-        (tgUser.first_name ? `${tgUser.first_name}_${telegramId}` : `user_${telegramId}`);
+      let username =
+        (tgUser.username && tgUser.username.trim()) ||
+        (tgUser.first_name ? `${tgUser.first_name.trim()}_${telegramId}` : `user_${telegramId}`);
 
       if (!user) {
-        user = await storage.createUser({
-          username,
-          password: "password",
-          telegramId,
-          tgUsername: tgUser.username ?? null,
-          firstName: tgUser.first_name ?? null,
-          lastName: tgUser.last_name ?? null,
-          avatarUrl: tgUser.photo_url ?? null,
-          referrerId: null,
-        } as any);
+        try {
+          user = await storage.createUser({
+            username,
+            password: "password",
+            telegramId,
+            tgUsername: tgUser.username ?? null,
+            firstName: tgUser.first_name ?? null,
+            lastName: tgUser.last_name ?? null,
+            avatarUrl: tgUser.photo_url ?? null,
+            referrerId: null,
+          } as any);
+        } catch (createErr: unknown) {
+          const msg = createErr && typeof (createErr as any).message === "string" ? (createErr as Error).message : "";
+          if (msg.includes("unique") || msg.includes("duplicate") || msg.includes("username")) {
+            username = `user_${telegramId}_${Date.now().toString(36)}`;
+            user = await storage.createUser({
+              username,
+              password: "password",
+              telegramId,
+              tgUsername: tgUser.username ?? null,
+              firstName: tgUser.first_name ?? null,
+              lastName: tgUser.last_name ?? null,
+              avatarUrl: tgUser.photo_url ?? null,
+              referrerId: null,
+            } as any);
+          } else {
+            throw createErr;
+          }
+        }
       } else {
         user =
           (await storage.updateUserProfile(user.id, {
@@ -141,9 +171,10 @@ export async function registerRoutes(
       return res.json(user);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: err.errors[0]?.message ?? "Ошибка данных" });
       }
-      return res.status(500).json({ message: "Internal server error" });
+      console.error("[telegram/login]", err);
+      return res.status(500).json({ message: "Ошибка сервера при входе. Попробуйте позже." });
     }
   });
 
