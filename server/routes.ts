@@ -481,18 +481,20 @@ export async function registerRoutes(
         return { res: r, data: await r.json().catch(() => ({})) };
       };
 
-      const toManager = await sendToChat(managerChatId, managerText);
       const toCustomer = customerChatId ? await sendToChat(customerChatId, customerText) : { res: { ok: true } };
+      const toManager = await sendToChat(managerChatId, managerText);
 
-      if (!toManager.res.ok) {
+      const managerOk = toManager.res.ok;
+      const customerOk = toCustomer.res.ok;
+
+      if (!customerOk && !managerOk) {
         const desc = toManager.data?.description || toManager.res.statusText || "Ошибка Telegram";
-        const hint = "Убедитесь, что получатель первым написал боту /start, или задайте TELEGRAM_ORDER_CHAT_ID (числовой id чата).";
         return res.status(502).json({
-          message: `Не удалось отправить заказ менеджеру: ${desc}. ${hint}`,
+          message: `Не удалось отправить заказ в Telegram: ${desc}. Напишите менеджеру @CEO_PE с составом заказа.`,
         });
       }
 
-      // Ссылка на бота для перехода в чат оплаты
+      // Ссылка на бота / менеджера для перехода в чат
       let botUrl: string | undefined;
       const botUsername = process.env.TELEGRAM_BOT_USERNAME;
       if (botUsername) {
@@ -504,8 +506,14 @@ export async function registerRoutes(
           botUrl = `https://t.me/${meData.result.username}`;
         }
       }
+      if (!botUrl) botUrl = "https://t.me/CEO_PE";
 
-      return res.json({ message: "Заказ отправлен в Telegram", botUrl, orderRef: `#${orderRef}` });
+      const orderRefStr = `#${orderRef}`;
+      const message = managerOk
+        ? "Заказ отправлен в Telegram"
+        : `Заказ принят. Напишите менеджеру @CEO_PE с номером заказа ${orderRefStr} для оформления.`;
+
+      return res.json({ message, botUrl, orderRef: orderRefStr });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
