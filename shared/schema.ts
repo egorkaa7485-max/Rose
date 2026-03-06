@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, bigint, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   points: integer("points").notNull().default(0),
   referralCode: text("referral_code").notNull().unique(),
   referrerId: integer("referrer_id"), // кто привёл (при использовании промокода)
-  telegramId: integer("telegram_id").unique(),
+  telegramId: bigint("telegram_id", { mode: "number" }).unique(),
   tgUsername: text("tg_username"),
   firstName: text("first_name"),
   lastName: text("last_name"),
