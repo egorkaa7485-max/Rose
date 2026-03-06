@@ -463,25 +463,48 @@ export async function registerRoutes(
         return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN не настроен. Обратитесь к администратору." });
       }
 
-      const chatId = process.env.TELEGRAM_ORDER_CHAT_ID || "@CEO_PE";
-      const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-        }),
-      });
+      // Куда слать заказ: приоритет — чат менеджера, иначе заказчику (нужно, чтобы получатель первым написал боту /start)
+      const managerChatId = process.env.TELEGRAM_ORDER_CHAT_ID;
+      const customerChatId = user.telegramId != null ? String(user.telegramId) : null;
+      let chatId = managerChatId || customerChatId || "@CEO_PE";
 
-      const tgData = await tgRes.json().catch(() => ({}));
-      if (!tgRes.ok) {
-        const desc = tgData?.description || tgRes.statusText || "Ошибка Telegram";
+      const sendToChat = async (to: string) => {
+        const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: to, text }),
+        });
+        return { res: r, data: await r.json().catch(() => ({})) };
+      };
+
+      let result = await sendToChat(chatId);
+      if (!result.res.ok && customerChatId && chatId !== customerChatId) {
+        result = await sendToChat(customerChatId);
+        if (result.res.ok) chatId = customerChatId;
+      }
+
+      if (!result.res.ok) {
+        const desc = result.data?.description || result.res.statusText || "Ошибка Telegram";
+        const hint = "Убедитесь, что получатель первым написал боту /start, или задайте TELEGRAM_ORDER_CHAT_ID (числовой id чата).";
         return res.status(502).json({
-          message: `Не удалось отправить заказ в Telegram: ${desc}. Проверьте TELEGRAM_BOT_TOKEN и что бот добавлен в чат/канал.`,
+          message: `Не удалось отправить заказ в Telegram: ${desc}. ${hint}`,
         });
       }
 
-      return res.json({ message: "Заказ отправлен в Telegram" });
+      // Ссылка на бота для перехода в чат оплаты
+      let botUrl: string | undefined;
+      const botUsername = process.env.TELEGRAM_BOT_USERNAME;
+      if (botUsername) {
+        botUrl = `https://t.me/${botUsername.replace(/^@/, "")}`;
+      } else {
+        const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`).catch(() => null);
+        const meData = meRes?.ok ? await meRes.json().catch(() => ({})) : null;
+        if (meData?.result?.username) {
+          botUrl = `https://t.me/${meData.result.username}`;
+        }
+      }
+
+      return res.json({ message: "Заказ отправлен в Telegram", botUrl });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({

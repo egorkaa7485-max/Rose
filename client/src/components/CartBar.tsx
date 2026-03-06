@@ -30,8 +30,9 @@ export function CartBar() {
       }
       clear();
       setOpen(false);
-      toast({ title: "Заказ отправлен", description: "Мы написали вам в Telegram." });
-      window.location.href = "https://t.me/CEO_PE";
+      toast({ title: "Заказ отправлен", description: "Перейдите в Telegram для оплаты." });
+      const botUrl = data?.botUrl || "https://t.me/CEO_PE";
+      window.location.href = botUrl;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Попробуйте ещё раз.";
       toast({
