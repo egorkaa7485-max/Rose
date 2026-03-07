@@ -11,31 +11,29 @@ if (!token) {
 
 const bot = new TelegramBot(token, { polling: true });
 
+const welcomeText =
+  `Приветствуем вас в Rose Bloom! 🌹🎁
+
+Наш бот создан для того, чтобы сделать ваши праздники еще ярче и радостнее. Здесь вы можете легко подарить или получить подарок на любой праздник, а также заработать баллы за приглашение друзей!
+
+Как это работает:
+1. Пригласите своих друзей в Rose Bloom.
+2. Если ваш друг закажет подарок, вы получите баллы.
+3. Накопленные баллы можно обменять на подарки для других!
+
+Давайте сделаем каждый праздник особенным вместе! 🎉✨`;
+
 bot.onText(/\/start/, (msg: TelegramBot.Message) => {
   const chatId = msg.chat.id;
-  const firstName = msg.from?.first_name || "";
-  const greeting = firstName
-    ? `Привет, ${firstName}! 👋`
-    : "Привет! 👋";
-  bot.sendMessage(
-    chatId,
-    greeting +
-      "\n\n🌸 Заходи в мини-апп Bloom & Rose — цветочный бутик с подарками и сюрпризами для особенных людей.\n\n" +
-      "Там ты найдёшь букеты, торты, подарки к 8 Марта и возможность отправить сюрприз любимому блогеру. " +
-      "Оформи заказ — мы всё красиво соберём и доставим.",
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "Открыть мини-апп",
-              web_app: { url: appUrl },
-            },
-          ],
-        ],
-      },
-    }
-  );
+  const siteUrl = appUrl.replace(/\/$/, "");
+  const displayUrl = siteUrl.replace(/^https?:\/\//, "") || "rose-production-f333.up.railway.app";
+  bot.sendMessage(chatId, welcomeText, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: displayUrl, url: siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}` }],
+      ],
+    },
+  });
 });
 
 console.log("Bot is running...");
