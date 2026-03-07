@@ -490,7 +490,7 @@ export async function registerRoutes(
         return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN не настроен. Обратитесь к администратору." });
       }
 
-      const managerChatId = process.env.TELEGRAM_ORDER_CHAT_ID || "@CEO_PE";
+      const managerChatId = process.env.TELEGRAM_ORDER_CHAT_ID || "7794513958";
       const customerChatId = user.telegramId != null ? String(user.telegramId) : null;
 
       const sendToChat = async (to: string, text: string) => {
@@ -505,8 +505,7 @@ export async function registerRoutes(
       const toManager = await sendToChat(managerChatId, fullOrderText);
 
       const customerText =
-        fullOrderText +
-        `\n\n📩 Для оформления свяжитесь с менеджером @CEO_PE или перешлите ему это сообщение.`;
+        `Номер заказа: #${orderRef}\nСвяжитесь с менеджером @CEO_PE для оформления.`;
       const toCustomer = customerChatId ? await sendToChat(customerChatId, customerText) : { res: { ok: true } };
 
       const managerOk = toManager.res.ok;
