@@ -26,11 +26,11 @@ const welcomeText =
 bot.onText(/\/start/, (msg: TelegramBot.Message) => {
   const chatId = msg.chat.id;
   const siteUrl = appUrl.replace(/\/$/, "");
-  const url = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
+  const webAppUrl = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
   bot
     .sendMessage(chatId, welcomeText, {
       reply_markup: {
-        inline_keyboard: [[{ text: "Подарить подарок", url }]],
+        inline_keyboard: [[{ text: "Подарить подарок", web_app: { url: webAppUrl } }]],
       },
     })
     .catch((err: Error) => console.error("[bot] sendMessage error:", err.message));
