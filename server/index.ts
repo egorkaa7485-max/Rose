@@ -134,13 +134,11 @@ app.use((req, res, next) => {
         bot.onText(/\/start/, (msg: { chat: { id: number } }) => {
           const chatId = msg.chat.id;
           const siteUrl = appUrl.replace(/\/$/, "");
-          const displayUrl = siteUrl.replace(/^https?:\/\//, "") || "rose-production-f333.up.railway.app";
+          const url = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
           bot
             .sendMessage(chatId, welcomeText, {
               reply_markup: {
-                inline_keyboard: [
-                  [{ text: displayUrl, url: siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}` }],
-                ],
+                inline_keyboard: [[{ text: "Подарить подарок", url }]],
               },
             })
             .catch((err: Error) => log(`bot sendMessage error: ${err.message}`, "bot"));
