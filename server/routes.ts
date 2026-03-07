@@ -449,6 +449,15 @@ export async function registerRoutes(
               });
             }
           }
+        } else {
+          for (let q = 0; q < item.quantity; q++) {
+            await storage.createOrder({
+              userId: mockUserId,
+              productId: item.productId,
+              paymentMethod: "telegram",
+              referrerId: user.referrerId ?? undefined,
+            });
+          }
         }
       }
 
@@ -497,8 +506,8 @@ export async function registerRoutes(
         return { res: r, data: await r.json().catch(() => ({})) };
       };
 
-      const toCustomer = customerChatId ? await sendToChat(customerChatId, customerText) : { res: { ok: true } };
       const toManager = await sendToChat(managerChatId, managerText);
+      const toCustomer = customerChatId ? await sendToChat(customerChatId, customerText) : { res: { ok: true } };
 
       const managerOk = toManager.res.ok;
       const customerOk = toCustomer.res.ok;
