@@ -623,6 +623,33 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/admin/broadcast", async (req, res) => {
+    if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text) return res.status(400).json({ message: "Текст сообщения не указан" });
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return res.status(500).json({ message: "TELEGRAM_BOT_TOKEN не настроен" });
+    const allUsers = await storage.getAllUsers();
+    const withTelegram = allUsers.filter((u) => u.telegramId != null);
+    let sent = 0;
+    let failed = 0;
+    for (const u of withTelegram) {
+      const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: String(u.telegramId), text }),
+      });
+      if (r.ok) sent++;
+      else failed++;
+    }
+    res.json({
+      message: `Отправлено: ${sent}, не доставлено: ${failed}. Всего пользователей с Telegram: ${withTelegram.length}`,
+      sent,
+      failed,
+      total: withTelegram.length,
+    });
+  });
+
   app.get("/api/admin/products", async (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
     const category = req.query.category as string | undefined;

@@ -135,7 +135,10 @@ export default function Admin() {
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"orders" | "products" | "bonus" | "bloggers" | "users" | "gift">("orders");
+  const [tab, setTab] = useState<"orders" | "products" | "bonus" | "bloggers" | "users" | "gift" | "broadcast">("orders");
+  const [broadcastText, setBroadcastText] = useState("");
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
   const [giftCodes, setGiftCodes] = useState<any[]>([]);
   const [giftOrders, setGiftOrders] = useState<any[]>([]);
   const [editingUserPoints, setEditingUserPoints] = useState<string>("");
@@ -425,7 +428,7 @@ export default function Admin() {
     );
   }
 
-  if (loading && orders.length === 0 && products.length === 0 && bloggers.length === 0 && users.length === 0 && giftCodes.length === 0 && giftOrders.length === 0) {
+  if (loading && tab !== "broadcast" && orders.length === 0 && products.length === 0 && bloggers.length === 0 && users.length === 0 && giftCodes.length === 0 && giftOrders.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -551,6 +554,7 @@ export default function Admin() {
             ["bloggers", "Блогеры", Users],
             ["users", "Пользователи", User],
             ["gift", "Коды подарков", KeyRound],
+            ["broadcast", "Рассылка", MessageCircle],
           ] as const
         ).map(([t, label, Icon]) => (
           <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)}>
@@ -1033,6 +1037,59 @@ export default function Admin() {
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {tab === "broadcast" && (
+        <div className="space-y-4 max-w-xl">
+          <p className="text-sm text-muted-foreground">
+            Сообщение будет отправлено в Telegram всем пользователям, у которых указан Telegram ID.
+          </p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!savedSecret || !broadcastText.trim()) return;
+              setBroadcastLoading(true);
+              setBroadcastResult(null);
+              try {
+                const data = await fetchAdmin<{ message: string; sent: number; failed: number; total: number }>(
+                  "/api/admin/broadcast",
+                  savedSecret,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: broadcastText.trim() }),
+                  }
+                );
+                setBroadcastResult(data.message);
+                setBroadcastText("");
+              } catch (err) {
+                setBroadcastResult((err as Error).message);
+              } finally {
+                setBroadcastLoading(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <Label>Текст сообщения</Label>
+              <Textarea
+                value={broadcastText}
+                onChange={(e) => setBroadcastText(e.target.value)}
+                placeholder="Введите текст рассылки..."
+                rows={5}
+                className="mt-1 bg-background"
+                required
+              />
+            </div>
+            <Button type="submit" disabled={broadcastLoading || !broadcastText.trim()} className="gap-2">
+              {broadcastLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+              {broadcastLoading ? "Отправка…" : "Отправить всем"}
+            </Button>
+          </form>
+          {broadcastResult && (
+            <p className="text-sm text-muted-foreground p-3 rounded-lg bg-muted">{broadcastResult}</p>
+          )}
         </div>
       )}
 
