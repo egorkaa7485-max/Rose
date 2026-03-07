@@ -477,17 +477,13 @@ export async function registerRoutes(
         return base;
       });
 
-      // Менеджеру @CEO_PE: кто заказал, номер заказа, вещи и суммы, итого
-      const managerText =
+      // Полный текст заказа для менеджера и (при необходимости) для пересылки от заказчика
+      const fullOrderText =
         `🌸 Новый заказ\n` +
         `Кто заказал: ${orderUsername}\n` +
         `Номер заказа: #${orderRef}\n\n` +
         `Вещи и суммы:\n${lines.map((l) => `• ${l}`).join("\n")}\n\n` +
         `Итого: ${(total / 100).toFixed(0)} ₽`;
-
-      // Пользователю: связь с менеджером и номер заказа
-      const customerText =
-        `Для оформления заказа свяжитесь с менеджером @CEO_PE.\nНомер заказа: #${orderRef}`;
 
       const token = process.env.TELEGRAM_BOT_TOKEN;
       if (!token) {
@@ -506,7 +502,11 @@ export async function registerRoutes(
         return { res: r, data: await r.json().catch(() => ({})) };
       };
 
-      const toManager = await sendToChat(managerChatId, managerText);
+      const toManager = await sendToChat(managerChatId, fullOrderText);
+
+      const customerText =
+        fullOrderText +
+        `\n\n📩 Для оформления свяжитесь с менеджером @CEO_PE или перешлите ему это сообщение.`;
       const toCustomer = customerChatId ? await sendToChat(customerChatId, customerText) : { res: { ok: true } };
 
       const managerOk = toManager.res.ok;
