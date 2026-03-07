@@ -438,26 +438,28 @@ export async function registerRoutes(
         }
       }
 
+      const orderUsername = user.tgUsername ? `@${user.tgUsername}` : user.username;
+      const orderRef = `BB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      // Строки для менеджера: вещь (название), кол-во, сумма за позицию
       const lines = input.items.map((item) => {
-        const base = `• ${item.name} × ${item.quantity} — ${(item.price * item.quantity / 100).toFixed(0)} ₽`;
+        const sum = (item.price * item.quantity / 100).toFixed(0);
+        const base = `${item.name} × ${item.quantity} — ${sum} ₽`;
         if (item.isForBlogger && item.bloggerNickname) {
-          return `${base} (для блогера ${item.bloggerNickname})`;
+          return `${base} (блогер ${item.bloggerNickname})`;
         }
         if (item.isGiftForUser && item.giftRecipientName) {
-          return `${base} (подарок для ${item.giftRecipientName})`;
+          return `${base} (подарок: ${item.giftRecipientName})`;
         }
         return base;
       });
 
-      const orderUsername = user.tgUsername ? `@${user.tgUsername}` : user.username;
-      const orderRef = `BB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-      // Менеджеру @CEO_PE: юзернейм заказчика и детали заказа
+      // Менеджеру @CEO_PE: кто заказал, номер заказа, вещи и суммы, итого
       const managerText =
-        `🌸 Новый заказ из мини-аппа Bloom & Bliss\n` +
-        `Заказчик: ${orderUsername}\n` +
+        `🌸 Новый заказ\n` +
+        `Кто заказал: ${orderUsername}\n` +
         `Номер заказа: #${orderRef}\n\n` +
-        `Позиции:\n${lines.join("\n")}\n\n` +
+        `Вещи и суммы:\n${lines.map((l) => `• ${l}`).join("\n")}\n\n` +
         `Итого: ${(total / 100).toFixed(0)} ₽`;
 
       // Пользователю: связь с менеджером и номер заказа
