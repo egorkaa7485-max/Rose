@@ -6,8 +6,6 @@ import multer from "multer";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { db } from "./db";
-import { bloggers as bloggersTable, products as productsTable } from "@shared/schema";
 import crypto from "crypto";
 
 declare module "express-session" {
@@ -39,32 +37,6 @@ const upload = multer({
     cb(ok ? null : new Error("Только изображения (jpg, png, webp, gif)"), ok);
   },
 });
-
-async function seedDatabase() {
-  const existingProducts = await storage.getProducts();
-  if (existingProducts.length === 0) {
-    // Seed Bloggers
-    const bloggers = [
-      { nickname: "@dina_saeva", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200&h=200" },
-      { nickname: "@karna.val", avatarUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=200&h=200" },
-      { nickname: "@gavrilinaa", avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=200&h=200" },
-    ];
-    for (const b of bloggers) {
-      await db.insert(bloggersTable).values(b);
-    }
-
-    // Seed Products
-    const prods = [
-      { name: "Pink Peonies", description: "Beautiful delicate pink peonies.", price: 2500, pointsPrice: 50, category: "flowers", imageUrl: "https://images.unsplash.com/photo-1563241527-300ecb969192?auto=format&fit=crop&q=80&w=500" },
-      { name: "8 March Gift Box", description: "Special gift box for women's day.", price: 5000, pointsPrice: null, category: "8march", imageUrl: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=500" },
-      { name: "Strawberry Cake", description: "Delicious strawberry cake with cream.", price: 1500, pointsPrice: 30, category: "cakes", imageUrl: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&q=80&w=500" },
-      { name: "Macarons Set", description: "Set of 6 pastel macarons.", price: 800, pointsPrice: 15, category: "pastries", imageUrl: "https://images.unsplash.com/photo-1569864358642-9d1684040f43?auto=format&fit=crop&q=80&w=500" },
-    ];
-    for (const p of prods) {
-      await db.insert(productsTable).values(p);
-    }
-  }
-}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -811,9 +783,6 @@ export async function registerRoutes(
     const list = await storage.getGiftOrders();
     res.json(list);
   });
-
-  // Seed database on startup
-  seedDatabase().catch(console.error);
 
   return httpServer;
 }
