@@ -69,7 +69,7 @@ export default function MockLogin() {
         </div>
         
         <h1 className="font-display font-bold text-3xl mb-2 text-foreground">
-          Bloom & Bliss
+          Rose
         </h1>
         <p className="text-muted-foreground mb-8">
           Добро пожаловать в наш атмосферный цветочный бутик. Войдите, чтобы окунуться в магию.

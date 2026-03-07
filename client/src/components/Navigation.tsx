@@ -6,7 +6,7 @@ export function TopBar() {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 glass px-6 py-4 flex items-center justify-between">
       <h1 className="font-display font-bold text-xl text-foreground tracking-tight">
-        Bloom & Bliss
+        Rose
       </h1>
     </header>
   );
