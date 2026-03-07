@@ -81,12 +81,12 @@ export function CartBar() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">{item.name}</div>
                   {item.isForBlogger && item.bloggerNickname && (
-                    <div className="text-xs text-primary">
+                    <div className="text-xs text-primary whitespace-nowrap overflow-hidden text-ellipsis">
                       Подарок для блогера {item.bloggerNickname}
                     </div>
                   )}
                   {item.isGiftForUser && item.giftRecipientName && (
-                    <div className="text-xs text-primary">
+                    <div className="text-xs text-primary whitespace-nowrap overflow-hidden text-ellipsis">
                       Подарок для {item.giftRecipientName}
                     </div>
                   )}
