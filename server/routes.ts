@@ -10,6 +10,16 @@ import { db } from "./db";
 import { bloggers as bloggersTable, products as productsTable } from "@shared/schema";
 import crypto from "crypto";
 
+declare module "express-session" {
+  interface SessionData {
+    userId?: number;
+  }
+}
+
+function getUserId(req: Request): number | null {
+  return req.session?.userId ?? null;
+}
+
 const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -29,9 +39,6 @@ const upload = multer({
     cb(ok ? null : new Error("Только изображения (jpg, png, webp, gif)"), ok);
   },
 });
-
-// Mock user for simplicity since we don't have real auth set up fully yet
-let mockUserId: number | null = null;
 
 async function seedDatabase() {
   const existingProducts = await storage.getProducts();
@@ -167,7 +174,7 @@ export async function registerRoutes(
           })) ?? user;
       }
 
-      mockUserId = user.id;
+      req.session.userId = user.id;
       return res.json(user);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -225,7 +232,7 @@ export async function registerRoutes(
       }
     }
 
-    mockUserId = user.id;
+    req.session.userId = user.id;
     res.json(user);
   });
 
@@ -246,6 +253,7 @@ export async function registerRoutes(
   });
 
   app.post(api.orders.create.path, async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     
     try {
@@ -284,6 +292,7 @@ export async function registerRoutes(
   });
 
   app.post(api.bloggerGifts.create.path, async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     
     try {
@@ -302,6 +311,7 @@ export async function registerRoutes(
   });
 
   app.get(api.user.me.path, async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     const user = await storage.getUser(mockUserId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -309,6 +319,7 @@ export async function registerRoutes(
   });
 
   app.post(api.user.useReferral.path, async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     
     try {
@@ -341,6 +352,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/gift-codes", async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     const user = await storage.getUser(mockUserId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -388,6 +400,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/gift-orders", async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     const { code, productId, recipientName } = req.body || {};
     if (!code || !productId) return res.status(400).json({ message: "Код и товар обязательны" });
@@ -406,6 +419,7 @@ export async function registerRoutes(
   });
 
   app.post(api.checkout.telegram.path, async (req, res) => {
+    const mockUserId = getUserId(req);
     if (!mockUserId) return res.status(401).json({ message: "Unauthorized" });
     try {
       const input = api.checkout.telegram.input.parse(req.body);
