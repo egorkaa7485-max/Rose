@@ -7,6 +7,7 @@ import {
   bloggerGifts,
   giftCodes,
   giftOrders,
+  uploads,
   type User,
   type Product,
   type Blogger,
@@ -128,6 +129,16 @@ export const storage = {
   async createBloggerGift(data: CreateBloggerGiftRequest): Promise<BloggerGift> {
     const [g] = await db.insert(bloggerGifts).values(data).returning();
     return g;
+  },
+
+  async createUpload(data: { data: string; mimeType: string; filename: string }): Promise<{ id: number }> {
+    const [u] = await db.insert(uploads).values(data).returning();
+    return { id: u.id };
+  },
+
+  async getUpload(id: number): Promise<{ data: string; mimeType: string } | undefined> {
+    const [u] = await db.select().from(uploads).where(eq(uploads.id, id));
+    return u ? { data: u.data, mimeType: u.mimeType } : undefined;
   },
 
   async createProduct(data: Omit<Product, "id">): Promise<Product> {

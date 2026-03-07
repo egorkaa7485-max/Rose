@@ -51,6 +51,14 @@ export const bloggerGifts = pgTable("blogger_gifts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Загруженные файлы (фото товаров, блогеров) — хранятся в БД, не теряются при перезапуске
+export const uploads = pgTable("uploads", {
+  id: serial("id").primaryKey(),
+  data: text("data").notNull(), // base64
+  mimeType: text("mime_type").notNull(),
+  filename: text("filename").notNull(),
+});
+
 // Коды для подарков: пользователь создаёт код, по нему другие могут отправить ему подарок
 export const giftCodes = pgTable("gift_codes", {
   id: serial("id").primaryKey(),

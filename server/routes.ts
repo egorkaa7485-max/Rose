@@ -1,7 +1,5 @@
 import express, { type Express, type Request } from "express";
 import type { Server } from "http";
-import path from "path";
-import fs from "fs";
 import multer from "multer";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
@@ -18,19 +16,8 @@ function getUserId(req: Request): number | null {
   return req.session?.userId ?? null;
 }
 
-const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname) || ".jpg";
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ok = /^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype);
@@ -42,7 +29,16 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.use("/uploads", express.static(UPLOADS_DIR));
+  app.get("/api/uploads/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id" });
+    const row = await storage.getUpload(id);
+    if (!row) return res.status(404).json({ message: "Not found" });
+    const buf = Buffer.from(row.data, "base64");
+    res.setHeader("Content-Type", row.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+    res.send(buf);
+  });
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN || "";
 
@@ -596,12 +592,21 @@ export async function registerRoutes(
 
   app.post("/api/admin/upload", (req, res) => {
     if (!isAdmin(req)) return res.status(401).json({ message: "Unauthorized" });
-    upload.single("file")(req, res, (err) => {
+    upload.single("file")(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message || "Ошибка загрузки" });
       const file = (req as any).file;
-      if (!file) return res.status(400).json({ message: "Файл не выбран" });
-      const url = `/uploads/${file.filename}`;
-      res.json({ url });
+      if (!file || !file.buffer) return res.status(400).json({ message: "Файл не выбран" });
+      try {
+        const data = file.buffer.toString("base64");
+        const { id } = await storage.createUpload({
+          data,
+          mimeType: file.mimetype || "image/jpeg",
+          filename: file.originalname || "image.jpg",
+        });
+        res.json({ url: `/api/uploads/${id}` });
+      } catch (e) {
+        res.status(500).json({ message: "Ошибка сохранения" });
+      }
     });
   });
 
