@@ -449,12 +449,22 @@ export async function registerRoutes(
         return base;
       });
 
-      // Полный текст заказа для менеджера и (при необходимости) для пересылки от заказчика
+      const forBloggers = [...new Set(input.items.filter((i) => i.isForBlogger && i.bloggerNickname).map((i) => i.bloggerNickname))];
+      const forFriends = [...new Set(input.items.filter((i) => i.isGiftForUser && i.giftRecipientName).map((i) => i.giftRecipientName))];
+      const giftLine =
+        forBloggers.length || forFriends.length
+          ? `\nКому подарок: ${[
+              ...forBloggers.map((n) => `блогеру ${n}`),
+              ...forFriends.map((n) => `другу ${n}`),
+            ].join("; ")}\n`
+          : "";
+
       const fullOrderText =
         `🌸 Новый заказ\n` +
         `Кто заказал: ${orderUsername}\n` +
-        `Номер заказа: #${orderRef}\n\n` +
-        `Вещи и суммы:\n${lines.map((l) => `• ${l}`).join("\n")}\n\n` +
+        `Номер заказа: #${orderRef}` +
+        giftLine +
+        `\nВещи и суммы:\n${lines.map((l) => `• ${l}`).join("\n")}\n\n` +
         `Итого: ${(total / 100).toFixed(0)} ₽`;
 
       const token = process.env.TELEGRAM_BOT_TOKEN;

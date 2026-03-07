@@ -137,7 +137,7 @@ export default function Profile() {
             <h3 className="font-display font-bold text-lg">Пригласить друзей</h3>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Делитесь своим кодом: когда друг совершит покупку, вы получите 500 баллов (после подтверждения в админке).
+            Делитесь своим кодом: когда друг совершит покупку, вы получите 500 баллов.
           </p>
           <div className="flex items-center bg-background rounded-xl border border-border p-2 pl-4 mb-4">
             <code className="flex-1 font-mono text-primary font-bold tracking-widest text-lg">

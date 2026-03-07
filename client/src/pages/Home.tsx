@@ -65,7 +65,7 @@ export default function Home() {
       
       <div className="mb-8">
         <h2 className="font-display font-bold text-4xl mb-2 text-foreground">
-          Коллекция <span className="text-gradient">Элегантности</span>
+          Коллекция <span className="text-gradient">волшебства</span>
         </h2>
         <p className="text-muted-foreground text-lg">
           Найдите идеальный подарок для особенного человека.
