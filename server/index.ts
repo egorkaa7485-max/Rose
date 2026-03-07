@@ -115,7 +115,40 @@ app.use((req, res, next) => {
     listenOptions.reusePort = true;
   }
 
-  httpServer.listen(listenOptions, () => {
+  httpServer.listen(listenOptions, async () => {
     log(`serving on port ${port}`);
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (token) {
+      try {
+        const TelegramBot = (await import("node-telegram-bot-api")).default;
+        const appUrl = process.env.APP_URL || "https://rose-production-f333.up.railway.app/";
+        const welcomeText =
+          "Приветствуем вас в Rose Bloom! 🌹🎁\n\n" +
+          "Наш бот создан для того, чтобы сделать ваши праздники еще ярче и радостнее. Здесь вы можете легко подарить или получить подарок на любой праздник, а также заработать баллы за приглашение друзей!\n\n" +
+          "Как это работает:\n" +
+          "1. Пригласите своих друзей в Rose Bloom.\n" +
+          "2. Если ваш друг закажет подарок, вы получите баллы.\n" +
+          "3. Накопленные баллы можно обменять на подарки для других!\n\n" +
+          "Давайте сделаем каждый праздник особенным вместе! 🎉✨";
+        const bot = new TelegramBot(token, { polling: true });
+        bot.onText(/\/start/, (msg: { chat: { id: number } }) => {
+          const chatId = msg.chat.id;
+          const siteUrl = appUrl.replace(/\/$/, "");
+          const displayUrl = siteUrl.replace(/^https?:\/\//, "") || "rose-production-f333.up.railway.app";
+          bot
+            .sendMessage(chatId, welcomeText, {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: displayUrl, url: siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}` }],
+                ],
+              },
+            })
+            .catch((err: Error) => log(`bot sendMessage error: ${err.message}`, "bot"));
+        });
+        log("Telegram bot polling started", "bot");
+      } catch (err) {
+        log(`Bot failed to start: ${(err as Error).message}`, "bot");
+      }
+    }
   });
 })();

@@ -27,13 +27,15 @@ bot.onText(/\/start/, (msg: TelegramBot.Message) => {
   const chatId = msg.chat.id;
   const siteUrl = appUrl.replace(/\/$/, "");
   const displayUrl = siteUrl.replace(/^https?:\/\//, "") || "rose-production-f333.up.railway.app";
-  bot.sendMessage(chatId, welcomeText, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: displayUrl, url: siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}` }],
-      ],
-    },
-  });
+  bot
+    .sendMessage(chatId, welcomeText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: displayUrl, url: siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}` }],
+        ],
+      },
+    })
+    .catch((err: Error) => console.error("[bot] sendMessage error:", err.message));
 });
 
 console.log("Bot is running...");
